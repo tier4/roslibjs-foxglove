@@ -1,0 +1,20 @@
+{
+  "name": "roslibjs-foxglove",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "author": "",
+  "license": "",
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@foxglove/rosmsg": "^4.2.2",
+    "@foxglove/rosmsg2-serialization": "^2.0.2",
+    "@foxglove/ws-protocol": "^0.7.1",
+    "eventemitter3": "^5.0.1"
+  }
+}
