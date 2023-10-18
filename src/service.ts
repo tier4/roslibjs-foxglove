@@ -16,7 +16,7 @@ export class Service<Request, Response> {
     callback: (response: Response) => void,
     failedCallback?: (error: string) => void
   ) {
-    this.#ros.__callService(
+    this.#ros._callService(
       this.#name,
       this.#serviceType,
       request,

@@ -15,6 +15,7 @@
     "@foxglove/rosmsg": "^4.2.2",
     "@foxglove/rosmsg2-serialization": "^2.0.2",
     "@foxglove/ws-protocol": "^0.7.1",
-    "eventemitter3": "^5.0.1"
+    "eventemitter3": "^5.0.1",
+    "isomorphic-ws": "^5.0.0"
   }
 }

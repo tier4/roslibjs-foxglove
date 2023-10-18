@@ -12,10 +12,10 @@ export class Topic<T> {
   }
 
   publish(message: T) {
-    this.#ros.__publish(this.#name, this.#messageType, message);
+    this.#ros._publish(this.#name, this.#messageType, message);
   }
 
   subscribe(callback: (message: T) => void) {
-    this.#ros.__subscribe(this.#name, this.#messageType, callback);
+    this.#ros._subscribe(this.#name, this.#messageType, callback);
   }
 }

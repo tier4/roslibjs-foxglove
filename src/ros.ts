@@ -3,21 +3,7 @@ import { NotImplemented } from "./error";
 import EventEmitter from "eventemitter3";
 import { MessageReader, MessageWriter } from "@foxglove/rosmsg2-serialization";
 import { parse } from "@foxglove/rosmsg";
-
-export interface IWebSocket {
-  binaryType: string;
-  protocol: string;
-  onerror: ((event: any) => void) | null | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
-  onopen: ((event: any) => void) | null | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
-  onclose: ((event: any) => void) | null | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
-  onmessage: ((event: any) => void) | null | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
-  close(): void;
-  send(
-    data: string | ArrayBuffer | ArrayBufferView,
-    /** Options available in Node "ws" library */
-    options?: { fin?: boolean }
-  ): void;
-}
+import WebSocket from "isomorphic-ws";
 
 interface EventTypes {
   connection: () => void;
@@ -25,7 +11,7 @@ interface EventTypes {
 
 export class Ros {
   #emitter = new EventEmitter<EventTypes>();
-  #client: FoxgloveClient;
+  #client: FoxgloveClient | undefined;
 
   #channels = new Map<string, Channel>();
   #services = new Map<string, Service>();
@@ -42,7 +28,11 @@ export class Ros {
 
   #callId = 0;
 
-  __publish<T>(name: string, messageType: string, message: T) {
+  /** @internal */
+  _publish<T>(name: string, messageType: string, message: T) {
+    if (!this.#client) {
+      return;
+    }
     const channel = this.#channels.get(name);
     if (channel && messageType === channel.schemaName) {
       const writer = new MessageWriter(parse(channel.schema, { ros2: true }));
@@ -57,11 +47,15 @@ export class Ros {
     }
   }
 
-  __subscribe<T>(
+  /** @internal */
+  _subscribe<T>(
     name: string,
     messageType: string,
     callback: (message: T) => void
   ) {
+    if (!this.#client) {
+      return;
+    }
     const channel = this.#channels.get(name);
     if (channel && messageType === channel.schemaName) {
       const channelId = this.#client.subscribe(channel.id);
@@ -74,13 +68,17 @@ export class Ros {
     }
   }
 
-  __callService<Request, Response>(
+  /** @internal */
+  _callService<Request, Response>(
     name: string,
     serviceType: string,
     request: Request,
     callback: (response: Response) => void,
     failedCallback?: (error: string) => void
   ) {
+    if (!this.#client) {
+      return;
+    }
     const service = this.#services.get(name);
     if (service && serviceType == service.type) {
       const callId = this.#callId++;
@@ -109,39 +107,10 @@ export class Ros {
     }
   }
 
-  constructor(socket: IWebSocket) {
-    this.#client = new FoxgloveClient({ ws: socket });
-    this.#client.on("open", () => {
-      this.#emitter.emit("connection");
-
-      // topicとserviceの監視
-      this.#client.on("advertise", (channels) => {
-        for (const channel of channels) {
-          this.#channels.set(channel.topic, channel);
-          const w = this.#subscribeWaitList.get(channel.topic);
-          if (w) {
-            this.__subscribe(channel.topic, w.messageType, w.callback);
-          }
-        }
-      });
-      this.#client.on("advertiseServices", (services) => {
-        for (const service of services) {
-          this.#services.set(service.name, service);
-        }
-      });
-
-      // subscribeしたトピックをすべてここで捌く
-      this.#client.on("message", (event) => {
-        const readerAndCallback = this.#readerAndCallback.get(
-          event.subscriptionId
-        );
-        if (readerAndCallback) {
-          readerAndCallback.callback(
-            readerAndCallback.reader.readMessage(event.data)
-          );
-        }
-      });
-    });
+  constructor(options: { url?: string | undefined }) {
+    if (options.url) {
+      this.connect(options.url);
+    }
   }
 
   on<T extends EventEmitter.EventNames<EventTypes>>(
@@ -160,12 +129,46 @@ export class Ros {
     return this;
   }
 
-  connect(socket: IWebSocket) {
-    this.#client = new FoxgloveClient({ ws: socket });
+  connect(url: string) {
+    this.#client = new FoxgloveClient({
+      ws: new WebSocket(url, [FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
+    });
+
+    this.#client.on("open", () => {
+      this.#emitter.emit("connection");
+    });
+
+    // topicとserviceの監視
+    this.#client.on("advertise", (channels) => {
+      for (const channel of channels) {
+        this.#channels.set(channel.topic, channel);
+        const w = this.#subscribeWaitList.get(channel.topic);
+        if (w) {
+          this._subscribe(channel.topic, w.messageType, w.callback);
+        }
+      }
+    });
+    this.#client.on("advertiseServices", (services) => {
+      for (const service of services) {
+        this.#services.set(service.name, service);
+      }
+    });
+
+    // subscribeしたトピックをすべてここで捌く
+    this.#client.on("message", (event) => {
+      const readerAndCallback = this.#readerAndCallback.get(
+        event.subscriptionId
+      );
+      if (readerAndCallback) {
+        readerAndCallback.callback(
+          readerAndCallback.reader.readMessage(event.data)
+        );
+      }
+    });
   }
 
   close() {
-    this.#client.close();
+    this.#client?.close();
   }
 
   authenticate(): never {
