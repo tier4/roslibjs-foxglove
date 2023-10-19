@@ -11,11 +11,24 @@ export class Topic<T> {
     this.#messageType = options.messageType;
   }
 
-  publish(message: T) {
-    this.#ros._publish(this.#name, this.#messageType, message);
+  get name() {
+    return this.#name;
+  }
+  get messageType() {
+    return this.#messageType;
   }
 
   subscribe(callback: (message: T) => void) {
     this.#ros._subscribe(this.#name, this.#messageType, callback);
+  }
+
+  unsubscribe(callback?: (message: T) => void): void {}
+
+  advertise(): void {}
+
+  unadvertise(): void {}
+
+  publish(message: T) {
+    this.#ros._publish(this.#name, this.#messageType, message);
   }
 }

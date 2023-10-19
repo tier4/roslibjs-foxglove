@@ -11,6 +11,13 @@ export class Service<Request, Response> {
     this.#serviceType = data.serviceType;
   }
 
+  get name() {
+    return this.#name;
+  }
+  get serviceType() {
+    return this.#serviceType;
+  }
+
   callService(
     request: Request,
     callback: (response: Response) => void,
@@ -24,4 +31,8 @@ export class Service<Request, Response> {
       failedCallback
     );
   }
+
+  advertise(callback: (request: Request, response: Response) => void): void {}
+
+  unadvertise(): void {}
 }
