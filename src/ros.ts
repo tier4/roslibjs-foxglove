@@ -9,12 +9,45 @@ interface EventTypes {
   connection: () => void;
 }
 
+class TopicOrId<T> {
+  #byTopic = new Map<string, T>();
+  #idToTopic = new Map<number, string>();
+
+  set(topic: string, id: number, value: T) {
+    this.#byTopic.set(topic, value);
+    this.#idToTopic.set(id, topic);
+  }
+
+  getByTopic(topic: string) {
+    return this.#byTopic.get(topic);
+  }
+
+  getById(id: number) {
+    return this.getByTopic(this.#idToTopic.get(id)!);
+  }
+
+  deleteByTopic(topic: string) {
+    this.#byTopic.delete(topic);
+  }
+
+  deleteById(id: number) {
+    this.deleteByTopic(this.#idToTopic.get(id)!);
+    this.#idToTopic.delete(id);
+  }
+
+  topics() {
+    return Array.from(this.#byTopic.keys());
+  }
+}
+
 export class Ros {
   #emitter = new EventEmitter<EventTypes>();
-  #client: FoxgloveClient | undefined;
+  #client?: FoxgloveClient;
 
-  #channels = new Map<string, Channel>();
+  //#channels = new Map<string, Channel>();
   #services = new Map<string, Service>();
+
+  #channels = new TopicOrId<Channel>();
 
   #subscribeWaitList = new Map<
     string,
@@ -33,7 +66,7 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const channel = this.#channels.get(name);
+    const channel = this.#channels.getByTopic(name);
     if (channel && messageType === channel.schemaName) {
       const writer = new MessageWriter(parse(channel.schema, { ros2: true }));
       const channelId = this.#client.advertise({
@@ -56,7 +89,7 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const channel = this.#channels.get(name);
+    const channel = this.#channels.getByTopic(name);
     if (channel && messageType === channel.schemaName) {
       const channelId = this.#client.subscribe(channel.id);
       this.#readerAndCallback.set(channelId, {
@@ -141,16 +174,25 @@ export class Ros {
     // topicとserviceの監視
     this.#client.on("advertise", (channels) => {
       for (const channel of channels) {
-        this.#channels.set(channel.topic, channel);
+        this.#channels.set(channel.topic, channel.id, channel);
         const w = this.#subscribeWaitList.get(channel.topic);
         if (w) {
           this._subscribe(channel.topic, w.messageType, w.callback);
         }
       }
     });
+    this.#client.on("unadvertise", (channelIds) => {
+      for (const channelId of channelIds) {
+        this.#channels.deleteById(channelId);
+      }
+    });
     this.#client.on("advertiseServices", (services) => {
       for (const service of services) {
         this.#services.set(service.name, service);
+      }
+    });
+    this.#client.on("unadvertiseServices", (serviceIds) => {
+      for (const serviceId of serviceIds) {
       }
     });
 
@@ -169,6 +211,7 @@ export class Ros {
 
   close() {
     this.#client?.close();
+    this.#client = undefined;
   }
 
   authenticate(): never {
@@ -186,8 +229,8 @@ export class Ros {
   getActionServers(): never {
     throw NotImplemented;
   }
-  getTopics(): never {
-    throw NotImplemented;
+  getTopics() {
+    return this.#channels.topics();
   }
   getTopicsForType(): never {
     throw NotImplemented;
