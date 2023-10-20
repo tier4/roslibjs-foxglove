@@ -9,37 +9,6 @@ interface EventTypes {
   connection: () => void;
 }
 
-class TopicOrId<T> {
-  #byTopic = new Map<string, T>();
-  #idToTopic = new Map<number, string>();
-
-  set(topic: string, id: number, value: T) {
-    this.#byTopic.set(topic, value);
-    this.#idToTopic.set(id, topic);
-  }
-
-  getByTopic(topic: string) {
-    return this.#byTopic.get(topic);
-  }
-
-  getById(id: number) {
-    return this.getByTopic(this.#idToTopic.get(id)!);
-  }
-
-  deleteByTopic(topic: string) {
-    this.#byTopic.delete(topic);
-  }
-
-  deleteById(id: number) {
-    this.deleteByTopic(this.#idToTopic.get(id)!);
-    this.#idToTopic.delete(id);
-  }
-
-  topics() {
-    return Array.from(this.#byTopic.keys());
-  }
-}
-
 export class Ros {
   #emitter = new EventEmitter<EventTypes>();
   #client?: FoxgloveClient;
@@ -47,7 +16,13 @@ export class Ros {
   //#channels = new Map<string, Channel>();
   #services = new Map<string, Service>();
 
-  #channels = new TopicOrId<Channel>();
+  //#channels = new TopicOrId<Channel>();
+
+  #idToChannel = new Map<number, Channel>();
+  #nameToChannel = new Map<string, Channel>();
+
+  #typeToReader = new Map<string, MessageReader>();
+  #typeToWriter = new Map<string, MessageWriter>();
 
   #subscribeWaitList = new Map<
     string,
@@ -66,17 +41,23 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const channel = this.#channels.getByTopic(name);
+    const channel = this.#nameToChannel.get(name);
     if (channel && messageType === channel.schemaName) {
-      const writer = new MessageWriter(parse(channel.schema, { ros2: true }));
+      const writer =
+        this.#typeToWriter.get(channel.schemaName) ??
+        (() => {
+          const writer = new MessageWriter(
+            parse(channel.schema, { ros2: true })
+          );
+          this.#typeToWriter.set(channel.schemaName, writer);
+          return writer;
+        })();
       const channelId = this.#client.advertise({
         topic: channel.topic,
         encoding: "cdr",
         schemaName: channel.schemaName,
       });
       this.#client.sendMessage(channelId, writer.writeMessage(message));
-    } else {
-      //
     }
   }
 
@@ -89,11 +70,20 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const channel = this.#channels.getByTopic(name);
+    const channel = this.#nameToChannel.get(name);
     if (channel && messageType === channel.schemaName) {
+      const reader =
+        this.#typeToReader.get(channel.schemaName) ??
+        (() => {
+          const reader = new MessageReader(
+            parse(channel.schema, { ros2: true })
+          );
+          this.#typeToReader.set(channel.schemaName, reader);
+          return reader;
+        })();
       const channelId = this.#client.subscribe(channel.id);
       this.#readerAndCallback.set(channelId, {
-        reader: new MessageReader(parse(channel.schema, { ros2: true })),
+        reader,
         callback,
       });
     } else {
@@ -114,13 +104,28 @@ export class Ros {
     }
     const service = this.#services.get(name);
     if (service && serviceType == service.type) {
+      const writer =
+        this.#typeToWriter.get(service.type) ??
+        (() => {
+          const writer = new MessageWriter(
+            parse(service.requestSchema, { ros2: true })
+          );
+          this.#typeToWriter.set(service.type, writer);
+          return writer;
+        })();
+
+      const reader =
+        this.#typeToReader.get(service.type) ??
+        (() => {
+          const reader = new MessageReader(
+            parse(service.responseSchema, { ros2: true })
+          );
+          this.#typeToReader.set(service.type, reader);
+          return reader;
+        })();
+
       const callId = this.#callId++;
-      const writer = new MessageWriter(
-        parse(service.requestSchema, { ros2: true })
-      );
-      const reader = new MessageReader(
-        parse(service.responseSchema, { ros2: true })
-      );
+
       this.#client.on("serviceCallResponse", (event) => {
         if (event.serviceId === service.id && event.callId === callId) {
           callback(reader.readMessage(event.data));
@@ -174,7 +179,8 @@ export class Ros {
     // topicとserviceの監視
     this.#client.on("advertise", (channels) => {
       for (const channel of channels) {
-        this.#channels.set(channel.topic, channel.id, channel);
+        this.#idToChannel.set(channel.id, channel);
+        this.#nameToChannel.set(channel.topic, channel);
         const w = this.#subscribeWaitList.get(channel.topic);
         if (w) {
           this._subscribe(channel.topic, w.messageType, w.callback);
@@ -183,7 +189,11 @@ export class Ros {
     });
     this.#client.on("unadvertise", (channelIds) => {
       for (const channelId of channelIds) {
-        this.#channels.deleteById(channelId);
+        const channel = this.#idToChannel.get(channelId);
+        if (channel) {
+          this.#idToChannel.delete(channel.id);
+          this.#nameToChannel.delete(channel.topic);
+        }
       }
     });
     this.#client.on("advertiseServices", (services) => {
@@ -230,7 +240,7 @@ export class Ros {
     throw NotImplemented;
   }
   getTopics() {
-    return this.#channels.topics();
+    //return this.#channels.topics();
   }
   getTopicsForType(): never {
     throw NotImplemented;
