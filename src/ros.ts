@@ -122,7 +122,6 @@ export class Ros {
           this.#serviceTypeToWriter.set(service.type, writer);
           return writer;
         })();
-
       const reader =
         this.#serviceTypeToReader.get(service.type) ??
         (() => {
@@ -133,19 +132,19 @@ export class Ros {
           return reader;
         })();
 
-      const callId = this.#callId++;
+      this.#callId =
+        this.#callId === Number.MAX_SAFE_INTEGER ? 0 : this.#callId + 1;
 
       this.#client.on("serviceCallResponse", (event) => {
-        if (event.serviceId === service.id && event.callId === callId) {
+        if (event.serviceId === service.id && event.callId === this.#callId) {
           callback(reader.readMessage(event.data));
         }
       });
-      const buf = writer.writeMessage(request);
       this.#client.sendServiceCallRequest({
         serviceId: service.id,
-        callId,
+        callId: this.#callId,
         encoding: "cdr",
-        data: new DataView(buf.buffer),
+        data: new DataView(writer.writeMessage(request).buffer),
       });
     } else {
       if (failedCallback) {
