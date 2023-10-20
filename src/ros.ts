@@ -13,16 +13,19 @@ export class Ros {
   #emitter = new EventEmitter<EventTypes>();
   #client?: FoxgloveClient;
 
-  //#channels = new Map<string, Channel>();
-  #services = new Map<string, Service>();
-
-  //#channels = new TopicOrId<Channel>();
-
   #idToChannel = new Map<number, Channel>();
-  #nameToChannel = new Map<string, Channel>();
+  #topicNameToChannel = new Map<string, Channel>();
 
-  #typeToReader = new Map<string, MessageReader>();
-  #typeToWriter = new Map<string, MessageWriter>();
+  #idToService = new Map<number, Service>();
+  #serviceNameToService = new Map<string, Service>();
+
+  #topicTypeToReader = new Map<string, MessageReader>();
+  #topicTypeToWriter = new Map<string, MessageWriter>();
+
+  #serviceTypeToReader = new Map<string, MessageReader>();
+  #serviceTypeToWriter = new Map<string, MessageWriter>();
+
+  #advertisedReaderIds = new Map<string, number>();
 
   #subscribeWaitList = new Map<
     string,
@@ -41,22 +44,28 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const channel = this.#nameToChannel.get(name);
+    const channel = this.#topicNameToChannel.get(name);
     if (channel && messageType === channel.schemaName) {
       const writer =
-        this.#typeToWriter.get(channel.schemaName) ??
+        this.#topicTypeToWriter.get(channel.schemaName) ??
         (() => {
           const writer = new MessageWriter(
             parse(channel.schema, { ros2: true })
           );
-          this.#typeToWriter.set(channel.schemaName, writer);
+          this.#topicTypeToWriter.set(channel.schemaName, writer);
           return writer;
         })();
-      const channelId = this.#client.advertise({
-        topic: channel.topic,
-        encoding: "cdr",
-        schemaName: channel.schemaName,
-      });
+      const channelId =
+        this.#advertisedReaderIds.get(channel.topic) ??
+        (() => {
+          const channelId = this.#client.advertise({
+            topic: channel.topic,
+            encoding: "cdr",
+            schemaName: channel.schemaName,
+          });
+          this.#advertisedReaderIds.set(channel.topic, channelId);
+          return channelId;
+        })();
       this.#client.sendMessage(channelId, writer.writeMessage(message));
     }
   }
@@ -70,15 +79,15 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const channel = this.#nameToChannel.get(name);
+    const channel = this.#topicNameToChannel.get(name);
     if (channel && messageType === channel.schemaName) {
       const reader =
-        this.#typeToReader.get(channel.schemaName) ??
+        this.#topicTypeToReader.get(channel.schemaName) ??
         (() => {
           const reader = new MessageReader(
             parse(channel.schema, { ros2: true })
           );
-          this.#typeToReader.set(channel.schemaName, reader);
+          this.#topicTypeToReader.set(channel.schemaName, reader);
           return reader;
         })();
       const channelId = this.#client.subscribe(channel.id);
@@ -102,25 +111,25 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const service = this.#services.get(name);
+    const service = this.#serviceNameToService.get(name);
     if (service && serviceType == service.type) {
       const writer =
-        this.#typeToWriter.get(service.type) ??
+        this.#serviceTypeToWriter.get(service.type) ??
         (() => {
           const writer = new MessageWriter(
             parse(service.requestSchema, { ros2: true })
           );
-          this.#typeToWriter.set(service.type, writer);
+          this.#serviceTypeToWriter.set(service.type, writer);
           return writer;
         })();
 
       const reader =
-        this.#typeToReader.get(service.type) ??
+        this.#serviceTypeToReader.get(service.type) ??
         (() => {
           const reader = new MessageReader(
             parse(service.responseSchema, { ros2: true })
           );
-          this.#typeToReader.set(service.type, reader);
+          this.#serviceTypeToReader.set(service.type, reader);
           return reader;
         })();
 
@@ -180,7 +189,7 @@ export class Ros {
     this.#client.on("advertise", (channels) => {
       for (const channel of channels) {
         this.#idToChannel.set(channel.id, channel);
-        this.#nameToChannel.set(channel.topic, channel);
+        this.#topicNameToChannel.set(channel.topic, channel);
         const w = this.#subscribeWaitList.get(channel.topic);
         if (w) {
           this._subscribe(channel.topic, w.messageType, w.callback);
@@ -192,17 +201,23 @@ export class Ros {
         const channel = this.#idToChannel.get(channelId);
         if (channel) {
           this.#idToChannel.delete(channel.id);
-          this.#nameToChannel.delete(channel.topic);
+          this.#topicNameToChannel.delete(channel.topic);
         }
       }
     });
     this.#client.on("advertiseServices", (services) => {
       for (const service of services) {
-        this.#services.set(service.name, service);
+        this.#idToService.set(service.id, service);
+        this.#serviceNameToService.set(service.name, service);
       }
     });
     this.#client.on("unadvertiseServices", (serviceIds) => {
       for (const serviceId of serviceIds) {
+        const service = this.#idToService.get(serviceId);
+        if (service) {
+          this.#idToService.delete(service.id);
+          this.#serviceNameToService.delete(service.name);
+        }
       }
     });
 
@@ -240,13 +255,13 @@ export class Ros {
     throw NotImplemented;
   }
   getTopics() {
-    //return this.#channels.topics();
+    return [...this.#topicNameToChannel.keys()];
   }
   getTopicsForType(): never {
     throw NotImplemented;
   }
-  getServices(): never {
-    throw NotImplemented;
+  getServices() {
+    return [...this.#serviceNameToService.keys()];
   }
   getServicesForType(): never {
     throw NotImplemented;
