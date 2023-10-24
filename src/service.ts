@@ -1,5 +1,11 @@
 import { Ros } from "./ros";
 
+export class ServiceRequest {
+  constructor(values: any) {
+    Object.assign(this, values);
+  }
+}
+
 export class Service<Request, Response> {
   #ros: Ros;
   #name: string;

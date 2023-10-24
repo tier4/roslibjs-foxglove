@@ -2,7 +2,7 @@ import { FoxgloveClient, Channel, Service } from "@foxglove/ws-protocol";
 import { NotImplemented } from "./error";
 import EventEmitter from "eventemitter3";
 import { MessageReader, MessageWriter } from "@foxglove/rosmsg2-serialization";
-import { parse } from "@foxglove/rosmsg";
+import { parse, parseRos2idl } from "@foxglove/rosmsg";
 import WebSocket from "isomorphic-ws";
 
 interface EventTypes {
@@ -88,7 +88,9 @@ export class Ros {
         this.#topicTypeToReader.get(channel.schemaName) ??
         (() => {
           const reader = new MessageReader(
-            parse(channel.schema, { ros2: true })
+            channel.schemaEncoding === "ros2idl"
+              ? parseRos2idl(channel.schema)
+              : parse(channel.schema, { ros2: true })
           );
           this.#topicTypeToReader.set(channel.schemaName, reader);
           return reader;
@@ -238,9 +240,11 @@ export class Ros {
         event.subscriptionId
       );
       if (readerAndCallback) {
-        readerAndCallback.callback(
-          readerAndCallback.reader.readMessage(event.data)
-        );
+        try {
+          readerAndCallback.callback(
+            readerAndCallback.reader.readMessage(event.data)
+          );
+        } catch {}
       }
     });
   }
