@@ -13,9 +13,12 @@ export class Ros {
   #emitter = new EventEmitter<EventTypes>();
   #client?: FoxgloveClient;
 
+  // Channels
   #idToChannel = new Map<number, Channel>();
   #topicNameToChannel = new Map<string, Channel>();
+  #topicNameToSubscriptionId = new Map<string, number>();
 
+  // Services
   #idToService = new Map<number, Service>();
   #serviceNameToService = new Map<string, Service>();
 
@@ -90,13 +93,22 @@ export class Ros {
           this.#topicTypeToReader.set(channel.schemaName, reader);
           return reader;
         })();
-      const channelId = this.#client.subscribe(channel.id);
-      this.#readerAndCallback.set(channelId, {
+      const subscriptionId = this.#client.subscribe(channel.id);
+      this.#readerAndCallback.set(subscriptionId, {
         reader,
         callback,
       });
+      this.#topicNameToSubscriptionId.set(name, subscriptionId);
     } else {
       this.#subscribeWaitList.set(name, { messageType, callback });
+    }
+  }
+
+  _unsubscribe<T>(name: string, callback?: (message: T) => void) {
+    const subscriptionId = this.#topicNameToSubscriptionId.get(name);
+    if (subscriptionId) {
+      this.#client?.unsubscribe(subscriptionId);
+      this.#readerAndCallback.delete(subscriptionId);
     }
   }
 
@@ -253,15 +265,36 @@ export class Ros {
   getActionServers(): never {
     throw NotImplemented;
   }
-  getTopics() {
-    return [...this.#topicNameToChannel.keys()];
+
+  getTopics(
+    callback: (result: { topics: string[]; types: string[] }) => void,
+    failedCallback?: (error: string) => void
+  ) {
+    if (true) {
+      callback({
+        topics: [...this.#topicNameToChannel.keys()],
+        types: [...this.#topicNameToChannel.values()].map((x) => x.schemaName),
+      });
+    } else if (failedCallback) {
+      // failedCallback("Error: getTopics()");
+    }
   }
+
   getTopicsForType(): never {
     throw NotImplemented;
   }
-  getServices() {
-    return [...this.#serviceNameToService.keys()];
+
+  getServices(
+    callback: (services: string[]) => void,
+    failedCallback?: (error: string) => void
+  ) {
+    if (true) {
+      callback([...this.#serviceNameToService.keys()]);
+    } else if (failedCallback) {
+      // failedCallback("Error: getServices()");
+    }
   }
+
   getServicesForType(): never {
     throw NotImplemented;
   }
@@ -283,9 +316,20 @@ export class Ros {
   getTopicType(): never {
     throw NotImplemented;
   }
-  getServiceType(): never {
-    throw NotImplemented;
+
+  getServiceType(
+    service: string,
+    callback: (type: string) => void,
+    failedCallback?: (error: string) => void
+  ) {
+    const type = this.#serviceNameToService.get(service)?.type;
+    if (type) {
+      callback(type);
+    } else if (failedCallback) {
+      failedCallback("Error: getServiceType()");
+    }
   }
+
   getMessageDetails(): never {
     throw NotImplemented;
   }

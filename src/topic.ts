@@ -22,7 +22,9 @@ export class Topic<T> {
     this.#ros._subscribe(this.#name, this.#messageType, callback);
   }
 
-  unsubscribe(callback?: (message: T) => void): void {}
+  unsubscribe(callback?: (message: T) => void) {
+    this.#ros._unsubscribe(this.#name, callback);
+  }
 
   advertise(): void {}
 
