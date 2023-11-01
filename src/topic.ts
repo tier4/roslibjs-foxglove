@@ -1,9 +1,17 @@
 import { Ros } from "./ros";
 
-export class Topic<T> {
+export class Message {
+  constructor(values: any) {
+    Object.assign(this, values);
+  }
+}
+
+export class Topic<T = Message> {
   #ros: Ros;
   #name: string;
   #messageType: string;
+
+  #subscriptionCallbacks = new Set<(message: T) => void>();
 
   constructor(options: { ros: Ros; name: string; messageType: string }) {
     this.#ros = options.ros;
@@ -19,11 +27,25 @@ export class Topic<T> {
   }
 
   subscribe(callback: (message: T) => void) {
-    this.#ros._subscribe(this.#name, this.#messageType, callback);
+    if (this.#subscriptionCallbacks.size === 0) {
+      this.#ros._subscribeTopic(
+        this.#name,
+        this.#messageType,
+        this.#subscriptionCallbacks
+      );
+    }
+    this.#subscriptionCallbacks.add(callback);
   }
 
   unsubscribe(callback?: (message: T) => void) {
-    this.#ros._unsubscribe(this.#name, callback);
+    if (callback) {
+      this.#subscriptionCallbacks.delete(callback);
+    } else {
+      this.#subscriptionCallbacks.clear();
+    }
+    if (this.#subscriptionCallbacks.size === 0) {
+      this.#ros._unsubscribeTopic(this.#name);
+    }
   }
 
   advertise(): void {}
@@ -31,6 +53,6 @@ export class Topic<T> {
   unadvertise(): void {}
 
   publish(message: T) {
-    this.#ros._publish(this.#name, this.#messageType, message);
+    this.#ros._publishTopic(this.#name, this.#messageType, message);
   }
 }

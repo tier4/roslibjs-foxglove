@@ -1,5 +1,6 @@
+import { Param } from "./param";
 import { Ros } from "./ros";
 import { Service, ServiceRequest } from "./service";
-import { Topic } from "./topic";
+import { Topic, Message } from "./topic";
 
-export default { Ros, Topic, Service, ServiceRequest };
+export { Ros, Topic, Service, ServiceRequest, Message, Param };
