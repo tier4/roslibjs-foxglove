@@ -34,10 +34,7 @@ export class Ros {
 
   #advertisedReaderIds = new Map<string, number>();
 
-  #subscribeWaitList = new Map<
-    string,
-    { messageType: string; callbacks: Set<(message: any) => void> }
-  >();
+  #subscribeWaitList = new Map<string, Set<(message: any) => void>>();
 
   #readerAndCallback = new Map<number, Set<(message: any) => void>>();
 
@@ -85,10 +82,7 @@ export class Ros {
       for (const channel of channels) {
         this.#channelIdToChannel.set(channel.id, channel);
         this.#topicNameToChannel.set(channel.topic, channel);
-        const w = this.#subscribeWaitList.get(channel.topic);
-        if (w) {
-          this._subscribeTopic(channel.topic, w.messageType, w.callbacks);
-        }
+        this.#processUnresolvedSubscriptions();
       }
     });
     this.#client.on("unadvertise", (channelIds) => {
@@ -144,6 +138,26 @@ export class Ros {
         }
       }
     });
+  }
+
+  #processUnresolvedSubscriptions() {
+    for (const [name, v] of this.#subscribeWaitList) {
+      if (!this.#client) {
+        return;
+      }
+
+      const channel = this.#topicNameToChannel.get(name);
+      if (channel) {
+        const subscriptionId =
+          (name === "/tf" ? this.#topicNameToSubscriptionId.get(name) : null) ??
+          this.#client.subscribe(channel.id);
+        this.#subscriptionIdToChannel.set(subscriptionId, channel);
+
+        this.#readerAndCallback.set(subscriptionId, v);
+        this.#topicNameToSubscriptionId.set(name, subscriptionId);
+        this.#subscribeWaitList.delete(name);
+      }
+    }
   }
 
   close() {
@@ -257,24 +271,8 @@ export class Ros {
     messageType: string,
     callbacks: Set<(message: T) => void>
   ) {
-    if (!this.#client) {
-      return;
-    }
-    const channel = this.#topicNameToChannel.get(name);
-    if (channel) {
-      const subscriptionId =
-        (name === "/tf" ? this.#topicNameToSubscriptionId.get(name) : null) ??
-        this.#client.subscribe(channel.id);
-      this.#subscriptionIdToChannel.set(subscriptionId, channel);
-
-      this.#readerAndCallback.set(subscriptionId, callbacks);
-      this.#topicNameToSubscriptionId.set(name, subscriptionId);
-    } else {
-      this.#subscribeWaitList.set(name, {
-        messageType,
-        callbacks,
-      });
-    }
+    this.#subscribeWaitList.set(name, callbacks);
+    this.#processUnresolvedSubscriptions();
   }
 
   /** @internal */
