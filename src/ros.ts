@@ -262,7 +262,9 @@ export class Ros {
     }
     const channel = this.#topicNameToChannel.get(name);
     if (channel) {
-      const subscriptionId = this.#client.subscribe(channel.id);
+      const subscriptionId =
+        (name === "/tf" ? this.#topicNameToSubscriptionId.get(name) : null) ??
+        this.#client.subscribe(channel.id);
       this.#subscriptionIdToChannel.set(subscriptionId, channel);
 
       this.#readerAndCallback.set(subscriptionId, callbacks);
@@ -296,7 +298,7 @@ export class Ros {
       return;
     }
     const service = this.#serviceNameToService.get(name);
-    if (service && serviceType == service.type) {
+    if (service) {
       const writer =
         this.#serviceTypeToWriter.get(service.type) ??
         (() => {
