@@ -6,7 +6,7 @@ export class ServiceRequest {
   }
 }
 
-export class Service<Request, Response> {
+export class Service<TServiceRequest = any, TServiceResponse = any> {
   #ros: Ros;
   #name: string;
   #serviceType: string;
@@ -25,20 +25,14 @@ export class Service<Request, Response> {
   }
 
   callService(
-    request: Request,
-    callback: (response: Response) => void,
+    request: TServiceRequest,
+    callback: (response: TServiceResponse) => void,
     failedCallback?: (error: string) => void
   ) {
-    this.#ros._callService(
-      this.#name,
-      this.#serviceType,
-      request,
-      callback,
-      failedCallback
-    );
+    this.#ros._callService(this.#name, request, callback, failedCallback);
   }
 
-  advertise(callback: (request: Request, response: Response) => void): void {}
+  advertise(_callback: (request: Request, response: Response) => void): void {}
 
   unadvertise(): void {}
 }

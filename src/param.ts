@@ -13,7 +13,7 @@ export class Param {
     this.#ros._getParameter(this.#name, callback);
   }
 
-  set(value: any, callback: (response: any) => void): void {}
+  set(_value: any, _callback: (response: any) => void): void {}
 
-  delete(callback: (response: any) => void): void {}
+  delete(_callback: (response: any) => void): void {}
 }

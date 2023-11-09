@@ -1,5 +1,9 @@
-import { FoxgloveClient, Channel, Service } from "@foxglove/ws-protocol";
-import { NotImplemented } from "./error";
+import {
+  FoxgloveClient,
+  Channel,
+  Service,
+  ServiceCallResponse,
+} from "@foxglove/ws-protocol";
 import EventEmitter from "eventemitter3";
 import { MessageReader, MessageWriter } from "@foxglove/rosmsg2-serialization";
 import { parse, parseRos2idl } from "@foxglove/rosmsg";
@@ -7,8 +11,8 @@ import WebSocket from "isomorphic-ws";
 
 interface EventTypes {
   connection: () => void;
-  close: () => void;
-  error: (event: any) => void;
+  close: (event: CloseEvent) => void;
+  error: (error: Error) => void;
 }
 
 export class Ros {
@@ -16,27 +20,26 @@ export class Ros {
   #client?: FoxgloveClient;
 
   // Channels
-  #channelIdToChannel = new Map<number, Channel>();
-  #topicNameToChannel = new Map<string, Channel>();
-  #subscriptionIdToChannel = new Map<number, Channel>();
-  #topicNameToSubscriptionId = new Map<string, number>();
+  #channelsById = new Map<number, Channel>();
+  #channelsByName = new Map<string, Channel>();
+  #channelsBySubscriptionId = new Map<number, Channel>();
+  #publisherIds = new Map<string, number>();
+  #subscriptionIds = new Map<string, number>();
 
   // Services
-  #serviceIdToService = new Map<number, Service>();
-  #serviceNameToService = new Map<string, Service>();
+  #servicesById = new Map<number, Service>();
+  #servicesByName = new Map<string, Service>();
   #serviceCallId = 0;
 
-  // Reader / Writer
-  #topicTypeToReader = new Map<string, MessageReader>();
-  #topicTypeToWriter = new Map<string, MessageWriter>();
-  #serviceTypeToReader = new Map<string, MessageReader>();
-  #serviceTypeToWriter = new Map<string, MessageWriter>();
+  // Message Readers / Writers
+  #messageReaders = new Map<string, MessageReader>();
+  #messageWriters = new Map<string, MessageWriter>();
 
-  #advertisedReaderIds = new Map<string, number>();
-
-  #subscribeWaitList = new Map<string, Set<(message: any) => void>>();
-
-  #readerAndCallback = new Map<number, Set<(message: any) => void>>();
+  #unresolvedSubscriptions = new Set<string>();
+  #subscriptionCallbacksSet = new Map<
+    string,
+    Set<Set<(message: unknown) => void>>
+  >();
 
   constructor(options: { url?: string | undefined }) {
     if (options.url) {
@@ -69,95 +72,68 @@ export class Ros {
       this.#emitter.emit("connection");
     });
 
-    this.#client.on("close", () => {
-      this.#emitter.emit("close");
+    this.#client.on("close", (event) => {
+      this.#emitter.emit("close", event);
     });
 
-    this.#client.on("error", (event) => {
-      this.#emitter.emit("error", event);
+    this.#client.on("error", (error) => {
+      this.#emitter.emit("error", error);
     });
 
-    // topicとserviceの監視
     this.#client.on("advertise", (channels) => {
       for (const channel of channels) {
-        this.#channelIdToChannel.set(channel.id, channel);
-        this.#topicNameToChannel.set(channel.topic, channel);
-        this.#processUnresolvedSubscriptions();
+        this.#channelsById.set(channel.id, channel);
+        this.#channelsByName.set(channel.topic, channel);
       }
+      this.#resolveSubscriptions();
     });
     this.#client.on("unadvertise", (channelIds) => {
       for (const channelId of channelIds) {
-        const channel = this.#channelIdToChannel.get(channelId);
+        const channel = this.#channelsById.get(channelId);
         if (channel) {
-          this.#channelIdToChannel.delete(channel.id);
-          this.#topicNameToChannel.delete(channel.topic);
+          this.#channelsById.delete(channel.id);
+          this.#channelsByName.delete(channel.topic);
         }
       }
     });
     this.#client.on("advertiseServices", (services) => {
       for (const service of services) {
-        this.#serviceIdToService.set(service.id, service);
-        this.#serviceNameToService.set(service.name, service);
+        this.#servicesById.set(service.id, service);
+        this.#servicesByName.set(service.name, service);
       }
     });
     this.#client.on("unadvertiseServices", (serviceIds) => {
       for (const serviceId of serviceIds) {
-        const service = this.#serviceIdToService.get(serviceId);
+        const service = this.#servicesById.get(serviceId);
         if (service) {
-          this.#serviceIdToService.delete(service.id);
-          this.#serviceNameToService.delete(service.name);
+          this.#servicesById.delete(service.id);
+          this.#servicesByName.delete(service.name);
         }
       }
     });
 
     // subscribeしたトピックをすべてここで捌く
     this.#client.on("message", (event) => {
-      const readerAndCallback = this.#readerAndCallback.get(
-        event.subscriptionId
-      );
-      const channel = this.#subscriptionIdToChannel.get(event.subscriptionId);
-      if (channel && readerAndCallback) {
-        const reader =
-          this.#topicTypeToReader.get(channel.schemaName) ??
-          (() => {
-            const reader = new MessageReader(
-              channel.schemaEncoding === "ros2idl"
-                ? parseRos2idl(channel.schema)
-                : parse(channel.schema, { ros2: true })
-            );
-            this.#topicTypeToReader.set(channel.schemaName, reader);
-            return reader;
-          })();
-        try {
-          for (const callback of readerAndCallback) {
-            callback(reader.readMessage(event.data));
+      const channel = this.#channelsBySubscriptionId.get(event.subscriptionId);
+      if (channel) {
+        const readerAndCallback = this.#subscriptionCallbacksSet.get(
+          channel.topic
+        );
+        if (readerAndCallback) {
+          const reader = this.#getMessageReader(channel);
+          for (const callbacks of readerAndCallback) {
+            for (const callback of callbacks) {
+              try {
+                callback(reader.readMessage(event.data));
+              } catch (error) {
+                console.error(error);
+                console.error(`${channel.schema}`);
+              }
+            }
           }
-        } catch (error) {
-          console.error(error);
-          console.error(`${channel.schema}`);
         }
       }
     });
-  }
-
-  #processUnresolvedSubscriptions() {
-    for (const [name, v] of this.#subscribeWaitList) {
-      if (!this.#client) {
-        return;
-      }
-
-      const channel = this.#topicNameToChannel.get(name);
-      if (channel) {
-        const subscriptionId =
-          (name === "/tf" ? this.#topicNameToSubscriptionId.get(name) : null) ??
-          this.#client.subscribe(channel.id);
-        this.#subscriptionIdToChannel.set(subscriptionId, channel);
-
-        this.#readerAndCallback.set(subscriptionId, v);
-        this.#topicNameToSubscriptionId.set(name, subscriptionId);
-        this.#subscribeWaitList.delete(name);
-      }
-    }
   }
 
   close() {
@@ -165,68 +141,21 @@ export class Ros {
     this.#client = undefined;
   }
 
-  authenticate(): never {
-    throw NotImplemented;
-  }
-  sendEncodedMessage(): never {
-    throw NotImplemented;
-  }
-  callOnConnection(): never {
-    throw NotImplemented;
-  }
-  setStatusLevel(): never {
-    throw NotImplemented;
-  }
-  getActionServers(): never {
-    throw NotImplemented;
-  }
-
   getTopics(
     callback: (result: { topics: string[]; types: string[] }) => void,
-    failedCallback?: (error: string) => void
+    _failedCallback?: (error: string) => void
   ) {
-    if (true) {
-      callback({
-        topics: [...this.#topicNameToChannel.keys()],
-        types: [...this.#topicNameToChannel.values()].map((x) => x.schemaName),
-      });
-    } else if (failedCallback) {
-      // failedCallback("Error: getTopics()");
-    }
-  }
-
-  getTopicsForType(): never {
-    throw NotImplemented;
+    callback({
+      topics: [...this.#channelsByName.keys()],
+      types: [...this.#channelsByName.values()].map((x) => x.schemaName),
+    });
   }
 
   getServices(
     callback: (services: string[]) => void,
-    failedCallback?: (error: string) => void
+    _failedCallback?: (error: string) => void
   ) {
-    if (true) {
-      callback([...this.#serviceNameToService.keys()]);
-    } else if (failedCallback) {
-      // failedCallback("Error: getServices()");
-    }
-  }
-
-  getServicesForType(): never {
-    throw NotImplemented;
-  }
-  getServiceRequestDetails(): never {
-    throw NotImplemented;
-  }
-  getServiceResponseDetails(): never {
-    throw NotImplemented;
-  }
-  getNodes(): never {
-    throw NotImplemented;
-  }
-  getNodeDetails(): never {
-    throw NotImplemented;
-  }
-  getParams(): never {
-    throw NotImplemented;
+    callback([...this.#servicesByName.keys()]);
   }
 
   getTopicType(
@@ -234,11 +163,11 @@ export class Ros {
     callback: (type: string) => void,
     failedCallback?: (error: string) => void
   ) {
-    const type = this.#topicNameToChannel.get(topic)?.schemaName;
-    if (type) {
-      callback(type);
+    const channel = this.#channelsByName.get(topic);
+    if (channel) {
+      callback(channel.schemaName);
     } else if (failedCallback) {
-      failedCallback("Error: getServiceType()");
+      failedCallback("Error: getTopicType");
     }
   }
 
@@ -247,47 +176,47 @@ export class Ros {
     callback: (type: string) => void,
     failedCallback?: (error: string) => void
   ) {
-    const type = this.#serviceNameToService.get(service)?.type;
-    if (type) {
-      callback(type);
+    const channel = this.#servicesByName.get(service);
+    if (channel) {
+      callback(channel.type);
     } else if (failedCallback) {
-      failedCallback("Error: getServiceType()");
+      failedCallback("Error: getServiceType");
     }
   }
 
-  getMessageDetails(): never {
-    throw NotImplemented;
-  }
-  decodeTypeDefs(): never {
-    throw NotImplemented;
-  }
-  getTopicsAndRawTypes(): never {
-    throw NotImplemented;
+  /** @internal */
+  _subscribe<T>(name: string, callbacks: Set<(message: T) => void>) {
+    if (!this.#subscriptionIds.has(name)) {
+      this.#unresolvedSubscriptions.add(name);
+    }
+    const subscriptionCallbacks =
+      this.#subscriptionCallbacksSet.get(name) ??
+      (() => {
+        const tmp = new Set<Set<(message: unknown) => void>>();
+        this.#subscriptionCallbacksSet.set(name, tmp);
+        return tmp;
+      })();
+    subscriptionCallbacks.add(callbacks as Set<(message: unknown) => void>);
+    this.#resolveSubscriptions();
   }
 
   /** @internal */
-  _subscribeTopic<T>(
-    name: string,
-    messageType: string,
-    callbacks: Set<(message: T) => void>
-  ) {
-    this.#subscribeWaitList.set(name, callbacks);
-    this.#processUnresolvedSubscriptions();
-  }
-
-  /** @internal */
-  _unsubscribeTopic(name: string) {
-    const subscriptionId = this.#topicNameToSubscriptionId.get(name);
+  _unsubscribe(name: string) {
+    if (!this.#client) {
+      return;
+    }
+    const subscriptionId = this.#subscriptionIds.get(name);
     if (subscriptionId) {
-      this.#client?.unsubscribe(subscriptionId);
-      this.#readerAndCallback.delete(subscriptionId);
+      this.#client.unsubscribe(subscriptionId);
+      this.#subscriptionCallbacksSet.delete(name);
+      this.#channelsBySubscriptionId.delete(subscriptionId);
+      this.#subscriptionIds.delete(name);
     }
   }
 
   /** @internal */
   _callService<Request, Response>(
     name: string,
-    serviceType: string,
     request: Request,
     callback: (response: Response) => void,
     failedCallback?: (error: string) => void
@@ -295,33 +224,18 @@ export class Ros {
     if (!this.#client) {
       return;
     }
-    const service = this.#serviceNameToService.get(name);
+    const service = this.#servicesByName.get(name);
     if (service) {
-      const writer =
-        this.#serviceTypeToWriter.get(service.type) ??
-        (() => {
-          const writer = new MessageWriter(
-            parse(service.requestSchema, { ros2: true })
-          );
-          this.#serviceTypeToWriter.set(service.type, writer);
-          return writer;
-        })();
-      const reader =
-        this.#serviceTypeToReader.get(service.type) ??
-        (() => {
-          const reader = new MessageReader(
-            parse(service.responseSchema, { ros2: true })
-          );
-          this.#serviceTypeToReader.set(service.type, reader);
-          return reader;
-        })();
-
+      const writer = this.#getMessageWriter(service);
+      const reader = this.#getMessageReader(service);
       const callId = this.#serviceCallId++;
-      this.#client.on("serviceCallResponse", (event) => {
+      const listener = (event: ServiceCallResponse) => {
         if (event.serviceId === service.id && event.callId === callId) {
           callback(reader.readMessage(event.data));
         }
-      });
+        this.#client?.off("serviceCallResponse", listener);
+      };
+      this.#client.on("serviceCallResponse", listener);
       this.#client.sendServiceCallRequest({
         serviceId: service.id,
         callId,
@@ -336,39 +250,29 @@ export class Ros {
   }
 
   /** @internal */
-  _unadvertise() {}
-
-  /** @internal */
-  _publishTopic<T>(name: string, messageType: string, message: T) {
+  _publish<T>(name: string, message: T) {
     if (!this.#client) {
       return;
     }
-    const channel = this.#topicNameToChannel.get(name);
+    const channel = this.#channelsByName.get(name);
     if (channel) {
-      const writer =
-        this.#topicTypeToWriter.get(channel.schemaName) ??
-        (() => {
-          const writer = new MessageWriter(
-            parse(channel.schema, { ros2: true })
-          );
-          this.#topicTypeToWriter.set(channel.schemaName, writer);
-          return writer;
-        })();
+      const writer = this.#getMessageWriter(channel);
       const channelId =
-        this.#advertisedReaderIds.get(channel.topic) ??
+        this.#publisherIds.get(channel.topic) ??
         (() => {
-          const channelId = this.#client.advertise({
+          const tmp = this.#client.advertise({
             topic: channel.topic,
             encoding: "cdr",
             schemaName: channel.schemaName,
           });
-          this.#advertisedReaderIds.set(channel.topic, channelId);
-          return channelId;
+          this.#publisherIds.set(channel.topic, tmp);
+          return tmp;
         })();
       this.#client.sendMessage(channelId, writer.writeMessage(message));
     }
   }
 
+  /** @internal */
   _getParameter(name: string, callback: (value: any) => void) {
     const replacedName = name.replace(":", ".");
     this.#client?.on("parameterValues", (event) => {
@@ -377,5 +281,74 @@ export class Ros {
       }
     });
     this.#client?.getParameters([replacedName]);
+  }
+
+  #getMessageReader(channelOrService: Channel | Service) {
+    const name =
+      "schemaName" in channelOrService
+        ? channelOrService.schemaName
+        : channelOrService.type;
+    const encoding =
+      "schemaEncoding" in channelOrService
+        ? channelOrService.schemaEncoding
+        : undefined;
+    const schema =
+      "schema" in channelOrService
+        ? channelOrService.schema
+        : channelOrService.responseSchema;
+    return (
+      this.#messageReaders.get(name) ??
+      (() => {
+        const tmp = new MessageReader(
+          encoding === "ros2idl"
+            ? parseRos2idl(schema)
+            : parse(schema, { ros2: true })
+        );
+        this.#messageReaders.set(name, tmp);
+        return tmp;
+      })()
+    );
+  }
+
+  #getMessageWriter(channelOrService: Channel | Service) {
+    const name =
+      "schemaName" in channelOrService
+        ? channelOrService.schemaName
+        : channelOrService.type;
+    const encoding =
+      "schemaEncoding" in channelOrService
+        ? channelOrService.schemaEncoding
+        : undefined;
+    const schema =
+      "schema" in channelOrService
+        ? channelOrService.schema
+        : channelOrService.requestSchema;
+    return (
+      this.#messageWriters.get(name) ??
+      (() => {
+        const tmp = new MessageWriter(
+          encoding === "ros2idl"
+            ? parseRos2idl(schema)
+            : parse(schema, { ros2: true })
+        );
+        this.#messageWriters.set(name, tmp);
+        return tmp;
+      })()
+    );
+  }
+
+  #resolveSubscriptions() {
+    if (!this.#client) {
+      return;
+    }
+    for (const name of this.#unresolvedSubscriptions) {
+      const channel = this.#channelsByName.get(name);
+      if (channel) {
+        const subscriptionId = this.#client.subscribe(channel.id);
+        this.#channelsBySubscriptionId.set(subscriptionId, channel);
+        this.#subscriptionIds.set(name, subscriptionId);
+        this.#unresolvedSubscriptions.delete(name);
+      }
+    }
   }
 }

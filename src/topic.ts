@@ -6,12 +6,12 @@ export class Message {
   }
 }
 
-export class Topic<T = Message> {
+export class Topic<TMessage = Message> {
   #ros: Ros;
   #name: string;
   #messageType: string;
 
-  #subscriptionCallbacks = new Set<(message: T) => void>();
+  #subscriptionCallbacks = new Set<(message: TMessage) => void>();
 
   constructor(options: { ros: Ros; name: string; messageType: string }) {
     this.#ros = options.ros;
@@ -26,25 +26,21 @@ export class Topic<T = Message> {
     return this.#messageType;
   }
 
-  subscribe(callback: (message: T) => void) {
+  subscribe(callback: (message: TMessage) => void) {
     if (this.#subscriptionCallbacks.size === 0) {
-      this.#ros._subscribeTopic(
-        this.#name,
-        this.#messageType,
-        this.#subscriptionCallbacks
-      );
+      this.#ros._subscribe(this.#name, this.#subscriptionCallbacks);
     }
     this.#subscriptionCallbacks.add(callback);
   }
 
-  unsubscribe(callback?: (message: T) => void) {
+  unsubscribe(callback?: (message: TMessage) => void) {
     if (callback) {
       this.#subscriptionCallbacks.delete(callback);
     } else {
       this.#subscriptionCallbacks.clear();
     }
     if (this.#subscriptionCallbacks.size === 0) {
-      this.#ros._unsubscribeTopic(this.#name);
+      this.#ros._unsubscribe(this.#name);
     }
   }
 
@@ -52,7 +48,7 @@ export class Topic<T = Message> {
 
   unadvertise(): void {}
 
-  publish(message: T) {
-    this.#ros._publishTopic(this.#name, this.#messageType, message);
+  publish(message: TMessage) {
+    this.#ros._publish(this.#name, message);
   }
 }
