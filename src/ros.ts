@@ -142,7 +142,6 @@ export class Ros {
 
   getTopics(
     callback: (result: { topics: string[]; types: string[] }) => void,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _failedCallback?: (error: string) => void
   ) {
     callback({
@@ -153,7 +152,6 @@ export class Ros {
 
   getServices(
     callback: (services: string[]) => void,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _failedCallback?: (error: string) => void
   ) {
     callback([...this.#servicesByName.keys()]);

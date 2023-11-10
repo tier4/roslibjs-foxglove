@@ -1,6 +1,7 @@
 import { Ros } from "./ros";
 
 export class Message {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(values: any) {
     Object.assign(this, values);
   }

@@ -1,11 +1,13 @@
 import { Ros } from "./ros";
 
 export class ServiceRequest {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(values: any) {
     Object.assign(this, values);
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class Service<TServiceRequest = any, TServiceResponse = any> {
   #ros: Ros;
   #name: string;
