@@ -127,7 +127,6 @@ export class Ros {
                 callback(reader.readMessage(event.data));
               } catch (error) {
                 console.error(error);
-                console.error(`${channel.schema}`);
               }
             }
           }
@@ -143,6 +142,7 @@ export class Ros {
 
   getTopics(
     callback: (result: { topics: string[]; types: string[] }) => void,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _failedCallback?: (error: string) => void
   ) {
     callback({
@@ -153,6 +153,7 @@ export class Ros {
 
   getServices(
     callback: (services: string[]) => void,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _failedCallback?: (error: string) => void
   ) {
     callback([...this.#servicesByName.keys()]);
@@ -231,17 +232,25 @@ export class Ros {
       const callId = this.#serviceCallId++;
       const listener = (event: ServiceCallResponse) => {
         if (event.serviceId === service.id && event.callId === callId) {
-          callback(reader.readMessage(event.data));
+          try {
+            callback(reader.readMessage(event.data));
+          } catch (error) {
+            console.error(error);
+          }
         }
         this.#client?.off("serviceCallResponse", listener);
       };
       this.#client.on("serviceCallResponse", listener);
-      this.#client.sendServiceCallRequest({
-        serviceId: service.id,
-        callId,
-        encoding: "cdr",
-        data: new DataView(writer.writeMessage(request).buffer),
-      });
+      try {
+        this.#client.sendServiceCallRequest({
+          serviceId: service.id,
+          callId,
+          encoding: "cdr",
+          data: new DataView(writer.writeMessage(request).buffer),
+        });
+      } catch (error) {
+        console.error(error);
+      }
     } else {
       if (failedCallback) {
         failedCallback("no service found");
@@ -268,11 +277,16 @@ export class Ros {
           this.#publisherIds.set(channel.topic, tmp);
           return tmp;
         })();
-      this.#client.sendMessage(channelId, writer.writeMessage(message));
+      try {
+        this.#client.sendMessage(channelId, writer.writeMessage(message));
+      } catch (error) {
+        console.error(error);
+      }
     }
   }
 
   /** @internal */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _getParameter(name: string, callback: (value: any) => void) {
     const replacedName = name.replace(":", ".");
     this.#client?.on("parameterValues", (event) => {
