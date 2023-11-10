@@ -3,6 +3,7 @@ import {
   Channel,
   Service,
   ServiceCallResponse,
+  ParameterValues,
 } from "@foxglove/ws-protocol";
 import EventEmitter from "eventemitter3";
 import { MessageReader, MessageWriter } from "@foxglove/rosmsg2-serialization";
@@ -286,13 +287,18 @@ export class Ros {
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _getParameter(name: string, callback: (value: any) => void) {
+    if (!this.#client) {
+      return;
+    }
     const replacedName = name.replace(":", ".");
-    this.#client?.on("parameterValues", (event) => {
+    const listener = (event: ParameterValues) => {
       if (event.parameters[0]?.name === replacedName) {
         callback(event.parameters[0].value);
       }
-    });
-    this.#client?.getParameters([replacedName]);
+      this.#client?.off("parameterValues", listener);
+    };
+    this.#client.on("parameterValues", listener);
+    this.#client.getParameters([replacedName]);
   }
 
   #getMessageReader(channelOrService: Channel | Service) {
