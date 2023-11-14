@@ -51,8 +51,41 @@ const subscription = new ROSLIB.Topic({
   name: "/sub",
   messageType: "std_msgs/msg/String",
 });
+
 subscription.subscribe((message) => {
   publisher.publish(message);
+});
+```
+
+## Call a Service
+
+```ts
+import * as ROSLIB from "roslibjs-foxglove";
+
+const ros = new ROSLIB.Ros({
+  url: "ws://localhost:8765",
+});
+
+ros.on("connection", () => {
+  console.log("connected");
+});
+
+ros.on("close", () => {
+  console.log("closed");
+});
+
+ros.on("error", (error) => {
+  console.log(error);
+});
+
+const service = new ROSLIB.Service({
+  ros: ros,
+  name: "/srv",
+  serviceType: "std_srvs/srv/SetBool",
+});
+
+service.callService({ data: true }, (response) => {
+  console.log(response);
 });
 ```
 

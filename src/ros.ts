@@ -20,6 +20,10 @@ export class Ros {
   #emitter = new EventEmitter<EventTypes>();
   #client?: FoxgloveClient;
 
+  // Message Readers / Writers
+  #messageReaders = new Map<string, MessageReader>();
+  #messageWriters = new Map<string, MessageWriter>();
+
   // Channels
   #channelsById = new Map<number, Channel>();
   #channelsByName = new Map<string, Channel>();
@@ -30,10 +34,6 @@ export class Ros {
   // Services
   #servicesById = new Map<number, Service>();
   #servicesByName = new Map<string, Service>();
-
-  // Message Readers / Writers
-  #messageReaders = new Map<string, MessageReader>();
-  #messageWriters = new Map<string, MessageWriter>();
 
   #unresolvedSubscriptions = new Set<string>();
   #subscriptionCallbacksSet = new Map<
