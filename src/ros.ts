@@ -30,7 +30,6 @@ export class Ros {
   // Services
   #servicesById = new Map<number, Service>();
   #servicesByName = new Map<string, Service>();
-  #serviceCallId = 0;
 
   // Message Readers / Writers
   #messageReaders = new Map<string, MessageReader>();
@@ -41,6 +40,9 @@ export class Ros {
     string,
     Set<Set<(message: unknown) => void>>
   >();
+
+  #callId = 0;
+  #paramId = 0;
 
   constructor(options: { url?: string | undefined }) {
     if (options.url) {
@@ -228,7 +230,7 @@ export class Ros {
     if (service) {
       const writer = this.#getMessageWriter(service);
       const reader = this.#getMessageReader(service);
-      const callId = this.#serviceCallId++;
+      const callId = this.#callId++;
       const listener = (event: ServiceCallResponse) => {
         if (event.serviceId === service.id && event.callId === callId) {
           try {
@@ -286,19 +288,38 @@ export class Ros {
 
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _getParameter(name: string, callback: (value: any) => void) {
+  _getParam(name: string, callback: (value: any) => void) {
     if (!this.#client) {
       return;
     }
     const replacedName = name.replace(":", ".");
+    const paramId = (this.#paramId++).toString();
     const listener = (event: ParameterValues) => {
-      if (event.parameters[0]?.name === replacedName) {
+      if (event.parameters[0]?.name === replacedName && event.id === paramId) {
         callback(event.parameters[0].value);
       }
       this.#client?.off("parameterValues", listener);
     };
     this.#client.on("parameterValues", listener);
-    this.#client.getParameters([replacedName]);
+    this.#client.getParameters([replacedName], paramId);
+  }
+
+  /** @internal */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _setParam(name: string, value: any, callback: (response: any) => void) {
+    if (!this.#client) {
+      return;
+    }
+    const replacedName = name.replace(":", ".");
+    const paramId = (this.#paramId++).toString();
+    const listener = (event: ParameterValues) => {
+      if (event.parameters[0]?.name === replacedName && event.id === paramId) {
+        callback(event.parameters[0]);
+      }
+      this.#client?.off("parameterValues", listener);
+    };
+    this.#client.on("parameterValues", listener);
+    this.#client.setParameters([{ name: replacedName, value }], paramId);
   }
 
   #getMessageReader(channelOrService: Channel | Service) {

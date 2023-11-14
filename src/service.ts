@@ -33,8 +33,4 @@ export class Service<TServiceRequest = any, TServiceResponse = any> {
   ) {
     this.#ros._callService(this.#name, request, callback, failedCallback);
   }
-
-  advertise(_callback: (request: Request, response: Response) => void): void {}
-
-  unadvertise(): void {}
 }
