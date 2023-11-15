@@ -1,14 +1,29 @@
 {
-  "name": "roslibjs-foxglove",
-  "version": "0.0.1",
+  "name": "@tier4/roslibjs-foxglove",
+  "version": "0.0.1-alpha.1",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
   },
-  "author": "Rin Iwai",
+  "author": "TIER IV, Inc.",
   "license": "",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tier4/roslibjs-foxglove.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tier4/roslibjs-foxglove/issues"
+  },
+  "files": [
+    "dist"
+  ],
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
