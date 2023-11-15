@@ -119,12 +119,10 @@ export class Ros {
     this.#client.on("message", (event) => {
       const channel = this.#channelsBySubscriptionId.get(event.subscriptionId);
       if (channel) {
-        const readerAndCallback = this.#subscriptionCallbacksSet.get(
-          channel.topic
-        );
-        if (readerAndCallback) {
+        const callbacksSet = this.#subscriptionCallbacksSet.get(channel.topic);
+        if (callbacksSet) {
           const reader = this.#getMessageReader(channel);
-          for (const callbacks of readerAndCallback) {
+          for (const callbacks of callbacksSet) {
             for (const callback of callbacks) {
               try {
                 callback(reader.readMessage(event.data));
