@@ -10,13 +10,12 @@ export class Param {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  get(callback: (value: any) => void): void {
-    this.#ros._getParameter(this.#name, callback);
+  get(callback: (value: any) => void) {
+    this.#ros._getParam(this.#name, callback);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  set(_value: any, _callback: (response: any) => void): void {}
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete(_callback: (response: any) => void): void {}
+  set(value: any, callback: (response: any) => void) {
+    this.#ros._setParam(this.#name, value, callback);
+  }
 }
