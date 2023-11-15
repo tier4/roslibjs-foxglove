@@ -20,7 +20,7 @@ ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ## Publish and Subscribe
 
 ```ts
-import * as ROSLIB from "roslibjs-foxglove";
+import * as ROSLIB from "@tier4/roslibjs-foxglove";
 
 const ros = new ROSLIB.Ros({
   url: "ws://localhost:8765",
@@ -60,7 +60,7 @@ subscription.subscribe((message) => {
 ## Call a Service
 
 ```ts
-import * as ROSLIB from "roslibjs-foxglove";
+import * as ROSLIB from "@tier4/roslibjs-foxglove";
 
 const ros = new ROSLIB.Ros({
   url: "ws://localhost:8765",
