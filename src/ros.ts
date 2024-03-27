@@ -6,7 +6,14 @@ import {
   ParameterValues,
 } from "@foxglove/ws-protocol";
 import EventEmitter from "eventemitter3";
-import { MessageReader, MessageWriter } from "@foxglove/rosmsg2-serialization";
+import {
+  MessageReader as Ros1MessageReader,
+  MessageWriter as Ros1MessageWriter,
+} from "@foxglove/rosmsg-serialization";
+import {
+  MessageReader as Ros2MessageReader,
+  MessageWriter as Ros2MessageWriter,
+} from "@foxglove/rosmsg2-serialization";
 import { parse, parseRos2idl } from "@foxglove/rosmsg";
 import WebSocket from "isomorphic-ws";
 
@@ -16,13 +23,19 @@ interface EventTypes {
   error: (error: Error) => void;
 }
 
+enum RosVersion {
+  Ros1,
+  Ros2,
+}
+
 export class Ros {
   #emitter = new EventEmitter<EventTypes>();
   #client?: FoxgloveClient;
+  #version: RosVersion = RosVersion.Ros2;
 
   // Message Readers / Writers
-  #messageReaders = new Map<string, MessageReader>();
-  #messageWriters = new Map<string, MessageWriter>();
+  #messageReaders = new Map<string, Ros1MessageReader | Ros2MessageReader>();
+  #messageWriters = new Map<string, Ros1MessageWriter | Ros2MessageWriter>();
 
   // Channels
   #channelsById = new Map<number, Channel>();
@@ -44,7 +57,7 @@ export class Ros {
   #callId = 0;
   #paramId = 0;
 
-  constructor(options: { url?: string | undefined }) {
+  constructor(options: { url?: string }) {
     if (options.url) {
       this.connect(options.url);
     }
@@ -71,7 +84,20 @@ export class Ros {
       ws: new WebSocket(url, [FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
     });
 
-    this.#client.on("open", () => {
+    // 接続してROSバージョン判別する処理
+    const open = new Promise<void>((resolve) => {
+      this.#client?.on("open", resolve);
+    });
+    const serverInfo = new Promise<void>((resolve) => {
+      this.#client?.on("serverInfo", (e) => {
+        this.#version =
+          e.supportedEncodings && e.supportedEncodings.includes("ros1")
+            ? RosVersion.Ros1
+            : RosVersion.Ros2;
+        resolve();
+      });
+    });
+    Promise.all([open, serverInfo]).then(() => {
       this.#emitter.emit("connection");
     });
 
@@ -244,7 +270,7 @@ export class Ros {
         this.#client.sendServiceCallRequest({
           serviceId: service.id,
           callId,
-          encoding: "cdr",
+          encoding: this.#version === RosVersion.Ros2 ? "cdr" : "ros1",
           data: new DataView(writer.writeMessage(request).buffer),
         });
       } catch (error) {
@@ -258,19 +284,18 @@ export class Ros {
   }
 
   /** @internal */
-  _publish<T>(name: string, message: T) {
-    if (!this.#client) {
-      return;
-    }
-    const channel = this.#channelsByName.get(name);
-    if (channel) {
+  _publish<T>(name: string, messageType: string, message: T) {
+    const publishImpl = (channel: Channel) => {
+      if (!this.#client) {
+        return;
+      }
       const writer = this.#getMessageWriter(channel);
       const channelId =
         this.#publisherIds.get(channel.topic) ??
         (() => {
           const tmp = this.#client.advertise({
             topic: channel.topic,
-            encoding: "cdr",
+            encoding: this.#version === RosVersion.Ros2 ? "cdr" : "ros1",
             schemaName: channel.schemaName,
           });
           this.#publisherIds.set(channel.topic, tmp);
@@ -281,6 +306,33 @@ export class Ros {
       } catch (error) {
         console.error(error);
       }
+    };
+
+    if (!this.#client) {
+      return;
+    }
+    const channel = this.#channelsByName.get(name);
+    if (!channel) {
+      const cb = (channels: Channel[]) => {
+        if (!this.#client) {
+          return;
+        }
+        const channel = channels.find((channel) => channel.topic === name);
+        if (channel) {
+          this.#client.off("advertise", cb);
+          publishImpl(channel);
+        }
+      };
+      this.#client.on("advertise", cb);
+
+      const tmp = this.#client.advertise({
+        topic: name,
+        encoding: this.#version === RosVersion.Ros2 ? "cdr" : "ros1",
+        schemaName: messageType,
+      });
+      this.#publisherIds.set(name, tmp);
+    } else {
+      publishImpl(channel);
     }
   }
 
@@ -326,6 +378,8 @@ export class Ros {
         ? channelOrService.schemaName
         : channelOrService.type;
     const encoding =
+      "encoding" in channelOrService ? channelOrService.encoding : undefined;
+    const schemaEncoding =
       "schemaEncoding" in channelOrService
         ? channelOrService.schemaEncoding
         : undefined;
@@ -336,11 +390,14 @@ export class Ros {
     return (
       this.#messageReaders.get(name) ??
       (() => {
-        const tmp = new MessageReader(
-          encoding === "ros2idl"
-            ? parseRos2idl(schema)
-            : parse(schema, { ros2: true })
-        );
+        const tmp =
+          encoding === "ros1"
+            ? new Ros1MessageReader(parse(schema, { ros2: false }))
+            : new Ros2MessageReader(
+                schemaEncoding === "ros2idl"
+                  ? parseRos2idl(schema)
+                  : parse(schema, { ros2: true })
+              );
         this.#messageReaders.set(name, tmp);
         return tmp;
       })()
@@ -353,6 +410,8 @@ export class Ros {
         ? channelOrService.schemaName
         : channelOrService.type;
     const encoding =
+      "encoding" in channelOrService ? channelOrService.encoding : undefined;
+    const schemaEncoding =
       "schemaEncoding" in channelOrService
         ? channelOrService.schemaEncoding
         : undefined;
@@ -363,11 +422,14 @@ export class Ros {
     return (
       this.#messageWriters.get(name) ??
       (() => {
-        const tmp = new MessageWriter(
-          encoding === "ros2idl"
-            ? parseRos2idl(schema)
-            : parse(schema, { ros2: true })
-        );
+        const tmp =
+          encoding === "ros1"
+            ? new Ros1MessageWriter(parse(schema, { ros2: false }))
+            : new Ros2MessageWriter(
+                schemaEncoding === "ros2idl"
+                  ? parseRos2idl(schema)
+                  : parse(schema, { ros2: true })
+              );
         this.#messageWriters.set(name, tmp);
         return tmp;
       })()

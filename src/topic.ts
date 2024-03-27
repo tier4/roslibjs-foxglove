@@ -50,6 +50,6 @@ export class Topic<TMessage = Message> {
   unadvertise(): void {}
 
   publish(message: TMessage) {
-    this.#ros._publish(this.#name, message);
+    this.#ros._publish(this.#name, this.#messageType, message);
   }
 }
