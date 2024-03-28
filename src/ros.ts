@@ -54,8 +54,8 @@ export class Ros {
     Set<Set<(message: unknown) => void>>
   >();
 
-  #callId = 0;
-  #paramId = 0;
+  static #callId = 0;
+  static #paramId = 0;
 
   constructor(options: { url?: string }) {
     if (options.url) {
@@ -254,7 +254,7 @@ export class Ros {
     if (service) {
       const writer = this.#getMessageWriter(service);
       const reader = this.#getMessageReader(service);
-      const callId = this.#callId++;
+      const callId = Ros.#callId++;
       const listener = (event: ServiceCallResponse) => {
         if (event.serviceId === service.id && event.callId === callId) {
           try {
@@ -284,55 +284,44 @@ export class Ros {
   }
 
   /** @internal */
-  _publish<T>(name: string, messageType: string, message: T) {
-    const publishImpl = (channel: Channel) => {
-      if (!this.#client) {
-        return;
-      }
-      const writer = this.#getMessageWriter(channel);
-      const channelId =
-        this.#publisherIds.get(channel.topic) ??
-        (() => {
-          const tmp = this.#client.advertise({
-            topic: channel.topic,
-            encoding: this.#version === RosVersion.Ros2 ? "cdr" : "ros1",
-            schemaName: channel.schemaName,
-          });
-          this.#publisherIds.set(channel.topic, tmp);
-          return tmp;
-        })();
-      try {
-        this.#client.sendMessage(channelId, writer.writeMessage(message));
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
+  async _publish<T>(name: string, messageType: string, message: T) {
     if (!this.#client) {
       return;
     }
-    const channel = this.#channelsByName.get(name);
-    if (!channel) {
+
+    const channelP = new Promise<Channel>((resolve) => {
+      const channel = this.#channelsByName.get(name);
+      if (channel) {
+        resolve(channel);
+      }
       const cb = (channels: Channel[]) => {
-        if (!this.#client) {
-          return;
-        }
-        const channel = channels.find((channel) => channel.topic === name);
-        if (channel) {
-          this.#client.off("advertise", cb);
-          publishImpl(channel);
+        for (const channel of channels) {
+          if (channel.topic === name) {
+            this.#client?.off("advertise", cb);
+            resolve(channel);
+          }
         }
       };
-      this.#client.on("advertise", cb);
+      this.#client?.on("advertise", cb);
+    });
 
-      const tmp = this.#client.advertise({
-        topic: name,
-        encoding: this.#version === RosVersion.Ros2 ? "cdr" : "ros1",
-        schemaName: messageType,
-      });
-      this.#publisherIds.set(name, tmp);
-    } else {
-      publishImpl(channel);
+    const channelId =
+      this.#publisherIds.get(name) ??
+      (() => {
+        const channelId = this.#client.advertise({
+          topic: name,
+          encoding: this.#version === RosVersion.Ros2 ? "cdr" : "ros1",
+          schemaName: messageType,
+        });
+        this.#publisherIds.set(name, channelId);
+        return channelId;
+      })();
+    const channel = await channelP;
+    const writer = this.#getMessageWriter(channel);
+    try {
+      this.#client.sendMessage(channelId, writer.writeMessage(message));
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -343,7 +332,7 @@ export class Ros {
       return;
     }
     const replacedName = name.replace(":", ".");
-    const paramId = (this.#paramId++).toString();
+    const paramId = (Ros.#paramId++).toString();
     const listener = (event: ParameterValues) => {
       if (event.parameters[0]?.name === replacedName && event.id === paramId) {
         callback(event.parameters[0].value);
@@ -361,7 +350,7 @@ export class Ros {
       return;
     }
     const replacedName = name.replace(":", ".");
-    const paramId = (this.#paramId++).toString();
+    const paramId = (Ros.#paramId++).toString();
     const listener = (event: ParameterValues) => {
       if (event.parameters[0]?.name === replacedName && event.id === paramId) {
         callback(event.parameters[0]);

@@ -19,7 +19,7 @@ ros.on("error", (error) => {
 // Publisher
 const publisher = new ROSLIB.Topic({
   ros: ros,
-  name: "/zzz/zzz",
+  name: "zzz/zzaaa",
   messageType: "std_msgs/msg/String",
 });
 
@@ -28,6 +28,8 @@ const subscription = new ROSLIB.Topic({
   ros: ros,
   name: "/rosout",
   messageType: "rosgraph_msgs/Log",
+}).subscribe((m) => {
+  console.log(m);
 });
 
 setInterval(() => {
