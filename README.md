@@ -1,4 +1,4 @@
-# roslibjs-foxglove
+# @tier4/roslibjs-foxglove
 
 An implementation of [roslibjs](https://github.com/RobotWebTools/roslibjs)'s interfaces by using [Foxglove ws-protocol](https://github.com/foxglove/ws-protocol).
 
@@ -97,3 +97,5 @@ npm run build
 ```
 
 # License
+
+@tier4/roslibjs-foxglove is released under the Apache 2.0 license.
