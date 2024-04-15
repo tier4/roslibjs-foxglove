@@ -36,8 +36,10 @@ export interface Subscription {
 }
 
 export class Impl {
-  #emitter = new EventEmitter<EventTypes>();
-  #client: Promise<FoxgloveClient>;
+  emitter = new EventEmitter<EventTypes>();
+
+  #client: FoxgloveClient;
+  #connecting: Promise<void>;
   #isRos1?: boolean;
 
   // Message Readers / Writers
@@ -52,88 +54,79 @@ export class Impl {
   #servicesById = new Map<number, Service>();
   #servicesByName = new Map<string, Service>();
 
-  static #callId = 0;
-  static #paramId = 0;
+  #publisherIdsWithCount = new Map<string, { id: number; count: number }>();
+  #subscriptionIdsWithCount = new Map<string, { id: number; count: number }>();
 
-  on<T extends EventEmitter.EventNames<EventTypes>>(
-    event: T,
-    fn: EventEmitter.EventListener<EventTypes, T>
-  ) {
-    this.#emitter.on(event, fn);
-  }
-
-  off<T extends EventEmitter.EventNames<EventTypes>>(
-    event: T,
-    fn: EventEmitter.EventListener<EventTypes, T>
-  ) {
-    this.#emitter.off(event, fn);
-  }
+  #callId = 0;
+  #paramId = 0;
 
   constructor(url: string) {
-    this.#client = new Promise<FoxgloveClient>((resolve) => {
-      const client = new FoxgloveClient({
-        ws: new WebSocket(url, [FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
-      });
+    this.#client = new FoxgloveClient({
+      ws: new WebSocket(url, [FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
+    });
 
-      const open = new Promise<void>((resolve) => {
-        client.on("open", resolve);
+    const open = new Promise<void>((resolve) => {
+      this.#client.on("open", resolve);
+    });
+    const serverInfo = new Promise<void>((resolve) => {
+      this.#client.on("serverInfo", (event) => {
+        this.#isRos1 =
+          (event.supportedEncodings &&
+            event.supportedEncodings.includes("ros1")) ??
+          false;
+        resolve();
       });
-      const serverInfo = new Promise<void>((resolve) => {
-        client.on("serverInfo", (e) => {
-          this.#isRos1 =
-            (e.supportedEncodings && e.supportedEncodings.includes("ros1")) ??
-            false;
-          resolve();
-        });
-      });
-      client.on("close", (event) => {
-        this.#emitter.emit("close", event);
-      });
-      client.on("error", (error) => {
-        this.#emitter.emit("error", error);
-      });
+    });
 
-      client.on("advertise", (channels) => {
-        for (const channel of channels) {
-          this.#channelsById.set(channel.id, channel);
-          this.#channelsByName.set(channel.topic, channel);
-        }
-      });
-      client.on("unadvertise", (channelIds) => {
-        for (const channelId of channelIds) {
-          const channel = this.#channelsById.get(channelId);
-          if (channel) {
-            this.#channelsById.delete(channel.id);
-            this.#channelsByName.delete(channel.topic);
-          }
-        }
-      });
+    this.#client.on("close", (event) => {
+      this.emitter.emit("close", event);
+    });
+    this.#client.on("error", (error?: Error) => {
+      this.emitter.emit("error", error ?? new Error("WebSocket error"));
+    });
 
-      client.on("advertiseServices", (services) => {
-        for (const service of services) {
-          this.#servicesById.set(service.id, service);
-          this.#servicesByName.set(service.name, service);
+    this.#client.on("advertise", (channels) => {
+      for (const channel of channels) {
+        this.#channelsById.set(channel.id, channel);
+        this.#channelsByName.set(channel.topic, channel);
+      }
+    });
+    this.#client.on("unadvertise", (channelIds) => {
+      for (const channelId of channelIds) {
+        const channel = this.#channelsById.get(channelId);
+        if (channel) {
+          this.#channelsById.delete(channel.id);
+          this.#channelsByName.delete(channel.topic);
         }
-      });
-      client.on("unadvertiseServices", (serviceIds) => {
-        for (const serviceId of serviceIds) {
-          const service = this.#servicesById.get(serviceId);
-          if (service) {
-            this.#servicesById.delete(service.id);
-            this.#servicesByName.delete(service.name);
-          }
-        }
-      });
+      }
+    });
 
+    this.#client.on("advertiseServices", (services) => {
+      for (const service of services) {
+        this.#servicesById.set(service.id, service);
+        this.#servicesByName.set(service.name, service);
+      }
+    });
+    this.#client.on("unadvertiseServices", (serviceIds) => {
+      for (const serviceId of serviceIds) {
+        const service = this.#servicesById.get(serviceId);
+        if (service) {
+          this.#servicesById.delete(service.id);
+          this.#servicesByName.delete(service.name);
+        }
+      }
+    });
+
+    this.#connecting = new Promise<void>((resolve) => {
       Promise.all([open, serverInfo]).then(() => {
-        this.#emitter.emit("connection");
-        resolve(client);
+        this.emitter.emit("connection");
+        resolve();
       });
     });
   }
 
-  async close() {
-    (await this.#client).close();
+  close() {
+    this.#client.close();
   }
 
   getTopics() {
@@ -159,22 +152,40 @@ export class Impl {
     name: string,
     messageType: string
   ): Promise<Publisher<T>> {
-    const client = await this.#client;
-    const channel_ = this.#getChannel(name);
-    const publisherId = client.advertise({
-      topic: name,
-      encoding: this.#isRos1 ? "ros1" : "cdr",
-      schemaName: messageType,
-    });
-    const channel = await channel_;
+    await this.#connecting;
+    const channel = this.#getChannel(name);
+
+    const publisherId = (() => {
+      const idWithCount = this.#publisherIdsWithCount.get(name);
+      if (idWithCount) {
+        idWithCount.count++;
+        return idWithCount.id;
+      } else {
+        const publisherId = this.#client.advertise({
+          topic: name,
+          encoding: this.#isRos1 ? "ros1" : "cdr",
+          schemaName: messageType,
+        });
+        this.#publisherIdsWithCount.set(name, { id: publisherId, count: 1 });
+        return publisherId;
+      }
+    })();
+
+    const writer = this.#getMessageWriter(await channel);
 
     return {
       publish: (message: T) => {
-        const writer = this.#getMessageWriter(channel);
-        client.sendMessage(publisherId, writer.writeMessage(message));
+        this.#client.sendMessage(publisherId, writer.writeMessage(message));
       },
       unadvertise: () => {
-        client.unadvertise(publisherId);
+        const idWithCount = this.#publisherIdsWithCount.get(name);
+        if (idWithCount) {
+          idWithCount.count--;
+          if (idWithCount.count === 0) {
+            this.#publisherIdsWithCount.delete(name);
+            this.#client.unadvertise(publisherId);
+          }
+        }
       },
     };
   }
@@ -183,99 +194,132 @@ export class Impl {
     name: string,
     callback: (message: T) => void
   ): Promise<Subscription> {
-    const client = await this.#client;
+    await this.#connecting;
     const channel = await this.#getChannel(name);
-    const subscriptionId = client.subscribe(channel.id);
+
+    const subscriptionId = (() => {
+      const idWithCount = this.#subscriptionIdsWithCount.get(name);
+      if (idWithCount) {
+        idWithCount.count++;
+        return idWithCount.id;
+      } else {
+        const subscriptionId = this.#client.subscribe(channel.id);
+        this.#subscriptionIdsWithCount.set(name, {
+          id: subscriptionId,
+          count: 1,
+        });
+        return subscriptionId;
+      }
+    })();
+
+    const reader = this.#getMessageReader(channel);
 
     const listener = (event: MessageData) => {
       if (event.subscriptionId === subscriptionId) {
-        const reader = this.#getMessageReader(channel);
         callback(reader.readMessage(event.data));
       }
     };
-    client.on("message", listener);
+    this.#client.on("message", listener);
 
     return {
       unsubscribe: () => {
-        client.off("message", listener);
-        client.unsubscribe(subscriptionId);
+        this.#client.off("message", listener);
+        const idWithCount = this.#subscriptionIdsWithCount.get(name);
+        if (idWithCount) {
+          idWithCount.count--;
+          if (idWithCount.count === 0) {
+            this.#subscriptionIdsWithCount.delete(name);
+            this.#client.unsubscribe(subscriptionId);
+          }
+        }
       },
     };
   }
 
   async sendServiceRequest<Request, Response>(name: string, request: Request) {
-    const client = await this.#client;
-    const service = this.#servicesByName.get(name);
-    if (!service) {
-      throw new Error("no service found");
-    }
+    await this.#connecting;
+    const service = await this.#getService(name);
     const writer = this.#getMessageWriter(service);
     const reader = this.#getMessageReader(service);
 
-    const callId = Impl.#callId++;
-    const response = new Promise<Response>((resolve) => {
+    const callId = this.#callId++;
+    return new Promise<Response>((resolve) => {
       const listener = (event: ServiceCallResponse) => {
         if (event.serviceId === service.id && event.callId === callId) {
-          client.off("serviceCallResponse", listener);
+          this.#client.off("serviceCallResponse", listener);
           resolve(reader.readMessage(event.data));
         }
       };
-      client.on("serviceCallResponse", listener);
+      this.#client.on("serviceCallResponse", listener);
+      this.#client.sendServiceCallRequest({
+        serviceId: service.id,
+        callId,
+        encoding: this.#isRos1 ? "ros1" : "cdr",
+        data: new DataView(writer.writeMessage(request).buffer),
+      });
     });
-    client.sendServiceCallRequest({
-      serviceId: service.id,
-      callId,
-      encoding: this.#isRos1 ? "ros1" : "cdr",
-      data: new DataView(writer.writeMessage(request).buffer),
-    });
-    return response;
   }
 
   async getParameter(name: string) {
-    const client = await this.#client;
-    const paramId = (Impl.#paramId++).toString();
-    const result = new Promise<ParameterValue>((resolve) => {
+    await this.#connecting;
+    const paramId = (this.#paramId++).toString();
+    return new Promise<ParameterValue>((resolve) => {
       const listener = (event: ParameterValues) => {
         if (event.parameters[0]?.name === name && event.id === paramId) {
-          client.off("parameterValues", listener);
+          this.#client.off("parameterValues", listener);
           resolve(event.parameters[0].value);
         }
       };
-      client.on("parameterValues", listener);
+      this.#client.on("parameterValues", listener);
+      this.#client.getParameters([name], paramId);
     });
-    client.getParameters([name], paramId);
-    return result;
   }
 
   async setParameter(name: string, value: ParameterValue) {
-    const client = await this.#client;
-    const paramId = (Impl.#paramId++).toString();
-    const result = new Promise<Parameter>((resolve) => {
+    await this.#connecting;
+    const paramId = (this.#paramId++).toString();
+    return new Promise<Parameter>((resolve) => {
       const listener = (event: ParameterValues) => {
         if (event.parameters[0]?.name === name && event.id === paramId) {
-          client.off("parameterValues", listener);
+          this.#client.off("parameterValues", listener);
           resolve(event.parameters[0]);
         }
       };
-      client.on("parameterValues", listener);
+      this.#client.on("parameterValues", listener);
+      this.#client.setParameters([{ name: name, value }], paramId);
     });
-    client.setParameters([{ name, value }], paramId);
-    return result;
   }
 
   async #getChannel(name: string) {
-    const client = await this.#client;
+    await this.#connecting;
     return (
       this.#channelsByName.get(name) ??
       (await new Promise<Channel>((resolve) => {
         const listener = (channels: Channel[]) => {
           const channel = channels.find((channel) => channel.topic === name);
           if (channel) {
-            client.off("advertise", listener);
+            this.#client.off("advertise", listener);
             resolve(channel);
           }
         };
-        client.on("advertise", listener);
+        this.#client.on("advertise", listener);
+      }))
+    );
+  }
+
+  async #getService(name: string) {
+    await this.#connecting;
+    return (
+      this.#servicesByName.get(name) ??
+      (await new Promise<Service>((resolve) => {
+        const listener = (services: Service[]) => {
+          const service = services.find((channel) => channel.name === name);
+          if (service) {
+            this.#client.off("advertiseServices", listener);
+            resolve(service);
+          }
+        };
+        this.#client.on("advertiseServices", listener);
       }))
     );
   }

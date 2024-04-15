@@ -16,7 +16,7 @@ export class Ros {
     event: T,
     fn: EventEmitter.EventListener<EventTypes, T>
   ): this {
-    this.rosImpl?.on(event, fn);
+    this.rosImpl?.emitter.on(event, fn);
     return this;
   }
 
@@ -24,7 +24,7 @@ export class Ros {
     event: T,
     fn: EventEmitter.EventListener<EventTypes, T>
   ): this {
-    this.rosImpl?.off(event, fn);
+    this.rosImpl?.emitter.off(event, fn);
     return this;
   }
 
