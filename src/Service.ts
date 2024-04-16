@@ -1,4 +1,4 @@
-import { Ros } from "./ros";
+import { Ros } from "./Ros";
 
 export class ServiceRequest {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,7 +8,7 @@ export class ServiceRequest {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class Service<TServiceRequest = any, TServiceResponse = any> {
+export class Service<TRequest = any, TResponse = any> {
   #ros: Ros;
   #name: string;
   #serviceType: string;
@@ -27,10 +27,13 @@ export class Service<TServiceRequest = any, TServiceResponse = any> {
   }
 
   callService(
-    request: TServiceRequest,
-    callback: (response: TServiceResponse) => void,
+    request: TRequest,
+    callback: (response: TResponse) => void,
     failedCallback?: (error: string) => void
   ) {
-    this.#ros._callService(this.#name, request, callback, failedCallback);
+    this.#ros.rosImpl
+      ?.sendServiceRequest<TRequest, TResponse>(this.name, request)
+      .then(callback)
+      .catch(failedCallback);
   }
 }
