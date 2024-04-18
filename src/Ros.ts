@@ -1,6 +1,6 @@
-import EventEmitter from "eventemitter3";
+import EventEmitter from 'eventemitter3';
 
-import { EventTypes, Impl } from "./Impl";
+import { EventTypes, Impl } from './Impl';
 
 export class Ros {
   /** @internal */
@@ -14,7 +14,7 @@ export class Ros {
 
   on<T extends EventEmitter.EventNames<EventTypes>>(
     event: T,
-    fn: EventEmitter.EventListener<EventTypes, T>
+    fn: EventEmitter.EventListener<EventTypes, T>,
   ): this {
     this.rosImpl?.emitter.on(event, fn);
     return this;
@@ -22,7 +22,7 @@ export class Ros {
 
   off<T extends EventEmitter.EventNames<EventTypes>>(
     event: T,
-    fn: EventEmitter.EventListener<EventTypes, T>
+    fn: EventEmitter.EventListener<EventTypes, T>,
   ): this {
     this.rosImpl?.emitter.off(event, fn);
     return this;
@@ -39,51 +39,51 @@ export class Ros {
 
   getTopics(
     callback: (result: { topics: string[]; types: string[] }) => void,
-    failedCallback?: (error: string) => void
+    failedCallback?: (error: string) => void,
   ) {
     const topics = this.rosImpl?.getTopics();
     if (topics) {
       callback(topics);
     } else if (failedCallback) {
-      failedCallback("Error: getTopics");
+      failedCallback('Error: getTopics');
     }
   }
 
   getServices(
     callback: (services: string[]) => void,
-    failedCallback?: (error: string) => void
+    failedCallback?: (error: string) => void,
   ) {
     const services = this.rosImpl?.getServices();
     if (services) {
       callback(services);
     } else if (failedCallback) {
-      failedCallback("Error: getServices");
+      failedCallback('Error: getServices');
     }
   }
 
   getTopicType(
     topic: string,
     callback: (type: string) => void,
-    failedCallback?: (error: string) => void
+    failedCallback?: (error: string) => void,
   ) {
     const topicType = this.rosImpl?.getTopicType(topic);
     if (topicType) {
       callback(topicType);
     } else if (failedCallback) {
-      failedCallback("Error: getTopicType");
+      failedCallback('Error: getTopicType');
     }
   }
 
   getServiceType(
     service: string,
     callback: (type: string) => void,
-    failedCallback?: (error: string) => void
+    failedCallback?: (error: string) => void,
   ) {
     const serviceType = this.rosImpl?.getServiceType(service);
     if (serviceType) {
       callback(serviceType);
     } else if (failedCallback) {
-      failedCallback("Error: getServiceType");
+      failedCallback('Error: getServiceType');
     }
   }
 }

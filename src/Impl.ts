@@ -7,18 +7,18 @@ import {
   MessageData,
   ParameterValue,
   Parameter,
-} from "@foxglove/ws-protocol";
-import EventEmitter from "eventemitter3";
+} from '@foxglove/ws-protocol';
+import EventEmitter from 'eventemitter3';
 import {
   MessageReader as Ros1MessageReader,
   MessageWriter as Ros1MessageWriter,
-} from "@foxglove/rosmsg-serialization";
+} from '@foxglove/rosmsg-serialization';
 import {
   MessageReader as Ros2MessageReader,
   MessageWriter as Ros2MessageWriter,
-} from "@foxglove/rosmsg2-serialization";
-import { parse, parseRos2idl } from "@foxglove/rosmsg";
-import WebSocket from "isomorphic-ws";
+} from '@foxglove/rosmsg2-serialization';
+import { parse, parseRos2idl } from '@foxglove/rosmsg';
+import WebSocket from 'isomorphic-ws';
 
 export interface EventTypes {
   connection: () => void;
@@ -66,32 +66,32 @@ export class Impl {
     });
 
     const open = new Promise<void>((resolve) => {
-      this.#client.on("open", resolve);
+      this.#client.on('open', resolve);
     });
     const serverInfo = new Promise<void>((resolve) => {
-      this.#client.on("serverInfo", (event) => {
+      this.#client.on('serverInfo', (event) => {
         this.#isRos1 =
           (event.supportedEncodings &&
-            event.supportedEncodings.includes("ros1")) ??
+            event.supportedEncodings.includes('ros1')) ??
           false;
         resolve();
       });
     });
 
-    this.#client.on("close", (event) => {
-      this.emitter.emit("close", event);
+    this.#client.on('close', (event) => {
+      this.emitter.emit('close', event);
     });
-    this.#client.on("error", (error?: Error) => {
-      this.emitter.emit("error", error ?? new Error("WebSocket error"));
+    this.#client.on('error', (error?: Error) => {
+      this.emitter.emit('error', error ?? new Error('WebSocket error'));
     });
 
-    this.#client.on("advertise", (channels) => {
+    this.#client.on('advertise', (channels) => {
       for (const channel of channels) {
         this.#channelsById.set(channel.id, channel);
         this.#channelsByName.set(channel.topic, channel);
       }
     });
-    this.#client.on("unadvertise", (channelIds) => {
+    this.#client.on('unadvertise', (channelIds) => {
       for (const channelId of channelIds) {
         const channel = this.#channelsById.get(channelId);
         if (channel) {
@@ -101,13 +101,13 @@ export class Impl {
       }
     });
 
-    this.#client.on("advertiseServices", (services) => {
+    this.#client.on('advertiseServices', (services) => {
       for (const service of services) {
         this.#servicesById.set(service.id, service);
         this.#servicesByName.set(service.name, service);
       }
     });
-    this.#client.on("unadvertiseServices", (serviceIds) => {
+    this.#client.on('unadvertiseServices', (serviceIds) => {
       for (const serviceId of serviceIds) {
         const service = this.#servicesById.get(serviceId);
         if (service) {
@@ -119,7 +119,7 @@ export class Impl {
 
     this.#connecting = new Promise<void>((resolve) => {
       Promise.all([open, serverInfo]).then(() => {
-        this.emitter.emit("connection");
+        this.emitter.emit('connection');
         resolve();
       });
     });
@@ -150,7 +150,7 @@ export class Impl {
 
   async createPublisher<T>(
     name: string,
-    messageType: string
+    messageType: string,
   ): Promise<Publisher<T>> {
     await this.#connecting;
     const channel = this.#getChannel(name);
@@ -163,7 +163,7 @@ export class Impl {
       } else {
         const publisherId = this.#client.advertise({
           topic: name,
-          encoding: this.#isRos1 ? "ros1" : "cdr",
+          encoding: this.#isRos1 ? 'ros1' : 'cdr',
           schemaName: messageType,
         });
         this.#publisherIdsWithCount.set(name, { id: publisherId, count: 1 });
@@ -192,7 +192,7 @@ export class Impl {
 
   async createSubscription<T>(
     name: string,
-    callback: (message: T) => void
+    callback: (message: T) => void,
   ): Promise<Subscription> {
     await this.#connecting;
     const channel = await this.#getChannel(name);
@@ -219,11 +219,11 @@ export class Impl {
         callback(reader.readMessage(event.data));
       }
     };
-    this.#client.on("message", listener);
+    this.#client.on('message', listener);
 
     return {
       unsubscribe: () => {
-        this.#client.off("message", listener);
+        this.#client.off('message', listener);
         const idWithCount = this.#subscriptionIdsWithCount.get(name);
         if (idWithCount) {
           idWithCount.count--;
@@ -246,15 +246,15 @@ export class Impl {
     return new Promise<Response>((resolve) => {
       const listener = (event: ServiceCallResponse) => {
         if (event.serviceId === service.id && event.callId === callId) {
-          this.#client.off("serviceCallResponse", listener);
+          this.#client.off('serviceCallResponse', listener);
           resolve(reader.readMessage(event.data));
         }
       };
-      this.#client.on("serviceCallResponse", listener);
+      this.#client.on('serviceCallResponse', listener);
       this.#client.sendServiceCallRequest({
         serviceId: service.id,
         callId,
-        encoding: this.#isRos1 ? "ros1" : "cdr",
+        encoding: this.#isRos1 ? 'ros1' : 'cdr',
         data: new DataView(writer.writeMessage(request).buffer),
       });
     });
@@ -266,11 +266,11 @@ export class Impl {
     return new Promise<ParameterValue>((resolve) => {
       const listener = (event: ParameterValues) => {
         if (event.parameters[0]?.name === name && event.id === paramId) {
-          this.#client.off("parameterValues", listener);
+          this.#client.off('parameterValues', listener);
           resolve(event.parameters[0].value);
         }
       };
-      this.#client.on("parameterValues", listener);
+      this.#client.on('parameterValues', listener);
       this.#client.getParameters([name], paramId);
     });
   }
@@ -281,11 +281,11 @@ export class Impl {
     return new Promise<Parameter>((resolve) => {
       const listener = (event: ParameterValues) => {
         if (event.parameters[0]?.name === name && event.id === paramId) {
-          this.#client.off("parameterValues", listener);
+          this.#client.off('parameterValues', listener);
           resolve(event.parameters[0]);
         }
       };
-      this.#client.on("parameterValues", listener);
+      this.#client.on('parameterValues', listener);
       this.#client.setParameters([{ name: name, value }], paramId);
     });
   }
@@ -298,11 +298,11 @@ export class Impl {
         const listener = (channels: Channel[]) => {
           const channel = channels.find((channel) => channel.topic === name);
           if (channel) {
-            this.#client.off("advertise", listener);
+            this.#client.off('advertise', listener);
             resolve(channel);
           }
         };
-        this.#client.on("advertise", listener);
+        this.#client.on('advertise', listener);
       }))
     );
   }
@@ -315,26 +315,26 @@ export class Impl {
         const listener = (services: Service[]) => {
           const service = services.find((channel) => channel.name === name);
           if (service) {
-            this.#client.off("advertiseServices", listener);
+            this.#client.off('advertiseServices', listener);
             resolve(service);
           }
         };
-        this.#client.on("advertiseServices", listener);
+        this.#client.on('advertiseServices', listener);
       }))
     );
   }
 
   #getMessageReader(channelOrService: Channel | Service) {
     const name =
-      "schemaName" in channelOrService
+      'schemaName' in channelOrService
         ? channelOrService.schemaName
         : channelOrService.type;
     const schemaEncoding =
-      "schemaEncoding" in channelOrService
+      'schemaEncoding' in channelOrService
         ? channelOrService.schemaEncoding
         : undefined;
     const schema =
-      "schema" in channelOrService
+      'schema' in channelOrService
         ? channelOrService.schema
         : channelOrService.responseSchema;
     return (
@@ -343,9 +343,9 @@ export class Impl {
         const reader = this.#isRos1
           ? new Ros1MessageReader(parse(schema, { ros2: false }))
           : new Ros2MessageReader(
-              schemaEncoding === "ros2idl"
+              schemaEncoding === 'ros2idl'
                 ? parseRos2idl(schema)
-                : parse(schema, { ros2: true })
+                : parse(schema, { ros2: true }),
             );
         this.#messageReaders.set(name, reader);
         return reader;
@@ -355,15 +355,15 @@ export class Impl {
 
   #getMessageWriter(channelOrService: Channel | Service) {
     const name =
-      "schemaName" in channelOrService
+      'schemaName' in channelOrService
         ? channelOrService.schemaName
         : channelOrService.type;
     const schemaEncoding =
-      "schemaEncoding" in channelOrService
+      'schemaEncoding' in channelOrService
         ? channelOrService.schemaEncoding
         : undefined;
     const schema =
-      "schema" in channelOrService
+      'schema' in channelOrService
         ? channelOrService.schema
         : channelOrService.requestSchema;
     return (
@@ -372,9 +372,9 @@ export class Impl {
         const writer = this.#isRos1
           ? new Ros1MessageWriter(parse(schema, { ros2: false }))
           : new Ros2MessageWriter(
-              schemaEncoding === "ros2idl"
+              schemaEncoding === 'ros2idl'
                 ? parseRos2idl(schema)
-                : parse(schema, { ros2: true })
+                : parse(schema, { ros2: true }),
             );
         this.#messageWriters.set(name, writer);
         return writer;
