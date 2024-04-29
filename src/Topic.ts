@@ -1,5 +1,5 @@
-import { Ros } from "./Ros";
-import { Publisher, Subscription } from "./Impl";
+import { Ros } from './Ros';
+import { Publisher, Subscription } from './Impl';
 
 export class Message {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,7 +62,7 @@ export class Topic<TMessage = Message> {
   advertise() {
     this.#publisher = this.#ros.rosImpl?.createPublisher(
       this.name,
-      this.messageType
+      this.messageType,
     );
   }
 

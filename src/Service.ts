@@ -1,4 +1,4 @@
-import { Ros } from "./Ros";
+import { Ros } from './Ros';
 
 export class ServiceRequest {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,7 +29,7 @@ export class Service<TRequest = any, TResponse = any> {
   callService(
     request: TRequest,
     callback: (response: TResponse) => void,
-    failedCallback?: (error: string) => void
+    failedCallback?: (error: string) => void,
   ) {
     this.#ros.rosImpl
       ?.sendServiceRequest<TRequest, TResponse>(this.name, request)
