@@ -20,36 +20,36 @@ ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ## Publish and Subscribe
 
 ```ts
-import * as ROSLIB from "@tier4/roslibjs-foxglove";
+import * as ROSLIB from '@tier4/roslibjs-foxglove';
 
 const ros = new ROSLIB.Ros({
-  url: "ws://localhost:8765",
+  url: 'ws://localhost:8765',
 });
 
-ros.on("connection", () => {
-  console.log("connected");
+ros.on('connection', () => {
+  console.log('connected');
 });
 
-ros.on("close", () => {
-  console.log("closed");
+ros.on('close', () => {
+  console.log('closed');
 });
 
-ros.on("error", (error) => {
+ros.on('error', (error) => {
   console.log(error);
 });
 
 // Publisher
 const publisher = new ROSLIB.Topic({
   ros: ros,
-  name: "/pub",
-  messageType: "std_msgs/msg/String",
+  name: '/pub',
+  messageType: 'std_msgs/msg/String',
 });
 
 // Subscription
 const subscription = new ROSLIB.Topic({
   ros: ros,
-  name: "/sub",
-  messageType: "std_msgs/msg/String",
+  name: '/sub',
+  messageType: 'std_msgs/msg/String',
 });
 
 subscription.subscribe((message) => {
@@ -60,28 +60,28 @@ subscription.subscribe((message) => {
 ## Call a Service
 
 ```ts
-import * as ROSLIB from "@tier4/roslibjs-foxglove";
+import * as ROSLIB from '@tier4/roslibjs-foxglove';
 
 const ros = new ROSLIB.Ros({
-  url: "ws://localhost:8765",
+  url: 'ws://localhost:8765',
 });
 
-ros.on("connection", () => {
-  console.log("connected");
+ros.on('connection', () => {
+  console.log('connected');
 });
 
-ros.on("close", () => {
-  console.log("closed");
+ros.on('close', () => {
+  console.log('closed');
 });
 
-ros.on("error", (error) => {
+ros.on('error', (error) => {
   console.log(error);
 });
 
 const service = new ROSLIB.Service({
   ros: ros,
-  name: "/srv",
-  serviceType: "std_srvs/srv/SetBool",
+  name: '/srv',
+  serviceType: 'std_srvs/srv/SetBool',
 });
 
 service.callService({ data: true }, (response) => {
