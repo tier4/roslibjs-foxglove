@@ -53,12 +53,7 @@ export class Ros {
     callback: (services: string[]) => void,
     failedCallback?: (error: string) => void,
   ) {
-    const services = this.rosImpl?.getServices();
-    if (services) {
-      callback(services);
-    } else if (failedCallback) {
-      failedCallback('Error: getServices');
-    }
+    this.rosImpl?.getServices().then(callback).catch(failedCallback);
   }
 
   getTopicType(

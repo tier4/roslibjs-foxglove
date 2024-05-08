@@ -1,14 +1,4 @@
-import {
-  FoxgloveClient,
-  Channel,
-  Service,
-  ServiceCallResponse,
-  ParameterValues,
-  MessageData,
-  ParameterValue,
-  Parameter,
-} from '@foxglove/ws-protocol';
-import EventEmitter from 'eventemitter3';
+import { parse, parseRos2idl } from '@foxglove/rosmsg';
 import {
   MessageReader as Ros1MessageReader,
   MessageWriter as Ros1MessageWriter,
@@ -17,7 +7,18 @@ import {
   MessageReader as Ros2MessageReader,
   MessageWriter as Ros2MessageWriter,
 } from '@foxglove/rosmsg2-serialization';
-import { parse, parseRos2idl } from '@foxglove/rosmsg';
+import {
+  Channel,
+  ConnectionGraphUpdate,
+  FoxgloveClient,
+  MessageData,
+  Parameter,
+  ParameterValue,
+  ParameterValues,
+  Service,
+  ServiceCallResponse,
+} from '@foxglove/ws-protocol';
+import EventEmitter from 'eventemitter3';
 import WebSocket from 'isomorphic-ws';
 
 export interface EventTypes {
@@ -137,7 +138,15 @@ export class Impl {
   }
 
   getServices() {
-    return [...this.#servicesByName.keys()];
+    return new Promise<string[]>((resolve) => {
+      const listener = (event: ConnectionGraphUpdate) => {
+        this.#client.off('connectionGraphUpdate', listener);
+        this.#client.unsubscribeConnectionGraph();
+        resolve(event.advertisedServices.map((service) => service.name));
+      };
+      this.#client.on('connectionGraphUpdate', listener);
+      this.#client.subscribeConnectionGraph();
+    });
   }
 
   getTopicType(topic: string) {
