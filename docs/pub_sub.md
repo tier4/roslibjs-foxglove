@@ -21,21 +21,18 @@ ros.on('error', (error) => {
   console.log(error);
 });
 
-// Publisher
 const publisher = new ROSLIB.Topic({
   ros: ros,
   name: '/pub',
   messageType: 'std_msgs/msg/String',
 });
 
-// Subscription
 const subscription = new ROSLIB.Topic({
   ros: ros,
   name: '/sub',
   messageType: 'std_msgs/msg/String',
 });
 
-// 
 subscription.subscribe((message) => {
   publisher.publish(message);
 });

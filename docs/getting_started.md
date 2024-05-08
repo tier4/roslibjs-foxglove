@@ -2,17 +2,16 @@
 
 ## ROS side
 
-First of all, install Foxglove bridge and rosapi.
+First, install Foxglove bridge.
 
 ```sh
-sudo apt install ros-$ROS_DISTRO-foxglove-bridge ros-$ROS_DISTRO-rosapi
+sudo apt install ros-$ROS_DISTRO-foxglove-bridge
 ```
 
-Launch two terminals and execute each commands below:
+Then, launch Foxglove bridge.
 
 ```sh
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
-ros2 run rosapi rosapi_node
 ```
 
 ## JS side
