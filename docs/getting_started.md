@@ -2,15 +2,10 @@
 
 ## ROS side
 
-First, install Foxglove bridge.
+Install and launch Foxglove bridge.
 
 ```sh
 sudo apt install ros-$ROS_DISTRO-foxglove-bridge
-```
-
-Then, launch Foxglove bridge.
-
-```sh
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 ```
 
