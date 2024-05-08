@@ -1,8 +1,8 @@
-import { Ros } from './Ros';
-import { Publisher, Subscription } from './Impl';
+import type { Publisher, Subscription } from './Impl';
+import type { Ros } from './Ros';
 
 export class Message {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   constructor(values: any) {
     Object.assign(this, values);
   }

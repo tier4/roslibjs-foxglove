@@ -1,5 +1,5 @@
-import { Parameter, ParameterValue } from '@foxglove/ws-protocol';
-import { Ros } from './Ros';
+import type { Parameter, ParameterValue } from '@foxglove/ws-protocol';
+import type { Ros } from './Ros';
 
 export class Param {
   #ros: Ros;

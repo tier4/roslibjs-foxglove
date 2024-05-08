@@ -1,14 +1,4 @@
-import {
-  FoxgloveClient,
-  Channel,
-  Service,
-  ServiceCallResponse,
-  ParameterValues,
-  MessageData,
-  ParameterValue,
-  Parameter,
-} from '@foxglove/ws-protocol';
-import EventEmitter from 'eventemitter3';
+import { parse, parseRos2idl } from '@foxglove/rosmsg';
 import {
   MessageReader as Ros1MessageReader,
   MessageWriter as Ros1MessageWriter,
@@ -17,7 +7,17 @@ import {
   MessageReader as Ros2MessageReader,
   MessageWriter as Ros2MessageWriter,
 } from '@foxglove/rosmsg2-serialization';
-import { parse, parseRos2idl } from '@foxglove/rosmsg';
+import {
+  type Channel,
+  FoxgloveClient,
+  type MessageData,
+  type Parameter,
+  type ParameterValue,
+  type ParameterValues,
+  type Service,
+  type ServiceCallResponse,
+} from '@foxglove/ws-protocol';
+import EventEmitter from 'eventemitter3';
 import WebSocket from 'isomorphic-ws';
 
 export interface EventTypes {
@@ -70,10 +70,7 @@ export class Impl {
     });
     const serverInfo = new Promise<void>((resolve) => {
       this.#client.on('serverInfo', (event) => {
-        this.#isRos1 =
-          (event.supportedEncodings &&
-            event.supportedEncodings.includes('ros1')) ??
-          false;
+        this.#isRos1 = event.supportedEncodings?.includes('ros1') ?? false;
         resolve();
       });
     });
@@ -160,15 +157,14 @@ export class Impl {
       if (idWithCount) {
         idWithCount.count++;
         return idWithCount.id;
-      } else {
-        const publisherId = this.#client.advertise({
-          topic: name,
-          encoding: this.#isRos1 ? 'ros1' : 'cdr',
-          schemaName: messageType,
-        });
-        this.#publisherIdsWithCount.set(name, { id: publisherId, count: 1 });
-        return publisherId;
       }
+      const publisherId = this.#client.advertise({
+        topic: name,
+        encoding: this.#isRos1 ? 'ros1' : 'cdr',
+        schemaName: messageType,
+      });
+      this.#publisherIdsWithCount.set(name, { id: publisherId, count: 1 });
+      return publisherId;
     })();
 
     const writer = this.#getMessageWriter(await channel);
@@ -202,14 +198,13 @@ export class Impl {
       if (idWithCount) {
         idWithCount.count++;
         return idWithCount.id;
-      } else {
-        const subscriptionId = this.#client.subscribe(channel.id);
-        this.#subscriptionIdsWithCount.set(name, {
-          id: subscriptionId,
-          count: 1,
-        });
-        return subscriptionId;
       }
+      const subscriptionId = this.#client.subscribe(channel.id);
+      this.#subscriptionIdsWithCount.set(name, {
+        id: subscriptionId,
+        count: 1,
+      });
+      return subscriptionId;
     })();
 
     const reader = this.#getMessageReader(channel);
