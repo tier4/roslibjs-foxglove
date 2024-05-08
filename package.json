@@ -7,9 +7,9 @@
   "types": "dist/esm/index.d.ts",
   "scripts": {
     "build": "tsc -b tsconfig.json tsconfig.cjs.json",
+    "clean": "rimraf dist",
     "format": "biome format --write src",
     "lint": "biome lint --apply src",
-    "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build"
   },
   "author": "TIER IV, Inc.",
@@ -24,7 +24,10 @@
   "bugs": {
     "url": "https://github.com/tier4/roslibjs-foxglove/issues"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "dependencies": {
     "@foxglove/rosmsg": "^4.2.2",
     "@foxglove/rosmsg-serialization": "^2.0.3",
@@ -35,6 +38,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.7.3",
+    "rimraf": "^5.0.5",
     "typescript": "^5.2.2"
   }
 }
