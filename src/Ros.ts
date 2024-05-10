@@ -3,13 +3,17 @@ import type EventEmitter from 'eventemitter3';
 import { type EventTypes, Impl } from './Impl';
 
 export class Ros {
-  /** @internal */
-  rosImpl?: Impl;
+  #rosImpl?: Impl;
 
   constructor(readonly options: { readonly url?: string }) {
     if (options.url) {
       this.connect(options.url);
     }
+  }
+
+  /** @internal */
+  get rosImpl() {
+    return this.#rosImpl;
   }
 
   on<T extends EventEmitter.EventNames<EventTypes>>(
@@ -29,12 +33,12 @@ export class Ros {
   }
 
   connect(url: string) {
-    this.rosImpl = new Impl(url);
+    this.#rosImpl = new Impl(url);
   }
 
   close() {
     this.rosImpl?.close();
-    this.rosImpl = undefined;
+    this.#rosImpl = undefined;
   }
 
   getTopics(
