@@ -1,13 +1,13 @@
-import { Ros } from './Ros';
+import type { Ros } from './Ros';
 
 export class ServiceRequest {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   constructor(values: any) {
     Object.assign(this, values);
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 export class Service<TRequest = any, TResponse = any> {
   #ros: Ros;
   #name: string;

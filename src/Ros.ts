@@ -1,6 +1,6 @@
-import EventEmitter from 'eventemitter3';
+import type EventEmitter from 'eventemitter3';
 
-import { EventTypes, Impl } from './Impl';
+import { type EventTypes, Impl } from './Impl';
 
 export class Ros {
   /** @internal */

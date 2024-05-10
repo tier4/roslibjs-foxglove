@@ -7,9 +7,9 @@
   "types": "dist/esm/index.d.ts",
   "scripts": {
     "build": "tsc -b tsconfig.json tsconfig.cjs.json",
-    "lint": "eslint --fix src",
-    "format": "prettier --write .",
-    "clean": "rm -rf dist",
+    "clean": "rimraf dist",
+    "format": "biome format --write src",
+    "lint": "biome lint --apply src",
     "prepublishOnly": "npm run clean && npm run build"
   },
   "author": "TIER IV, Inc.",
@@ -28,14 +28,6 @@
     "dist",
     "src"
   ],
-  "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "eslint": "^8.57.0",
-    "globals": "^15.0.0",
-    "prettier": "^3.2.5",
-    "typescript": "^5.2.2",
-    "typescript-eslint": "^7.7.0"
-  },
   "dependencies": {
     "@foxglove/rosmsg": "^4.2.2",
     "@foxglove/rosmsg-serialization": "^2.0.3",
@@ -43,5 +35,10 @@
     "@foxglove/ws-protocol": "^0.7.1",
     "eventemitter3": "^5.0.1",
     "isomorphic-ws": "^5.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.7.3",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.2.2"
   }
 }
