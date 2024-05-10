@@ -1,9 +1,9 @@
 name: publish package
 
-on: 
+on:
   push:
-    tags: 
-      - 'v*'
+    tags:
+      - "v*"
 
 jobs:
   publish:
@@ -15,11 +15,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '18'
+          node-version: 20
 
       - name: Install dependencies
         run: npm ci
 
       - name: Publish package
         run: npm publish
-```
