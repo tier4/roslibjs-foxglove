@@ -37,7 +37,7 @@ export interface Subscription {
 }
 
 export class Impl {
-  emitter = new EventEmitter<EventTypes>();
+  readonly emitter = new EventEmitter<EventTypes>();
 
   #client: FoxgloveClient;
   #connecting: Promise<void>;
