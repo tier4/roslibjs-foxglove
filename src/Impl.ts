@@ -1,4 +1,5 @@
 import { parse, parseRos2idl } from '@foxglove/rosmsg';
+import { parse, parseRos2idl } from '@foxglove/rosmsg';
 import {
   MessageReader as Ros1MessageReader,
   MessageWriter as Ros1MessageWriter,
@@ -134,7 +135,15 @@ export class Impl {
   }
 
   getServices() {
-    return [...this.#servicesByName.keys()];
+    return new Promise<string[]>((resolve) => {
+      const listener = (event: ConnectionGraphUpdate) => {
+        this.#client.off('connectionGraphUpdate', listener);
+        this.#client.unsubscribeConnectionGraph();
+        resolve(event.advertisedServices.map((service) => service.name));
+      };
+      this.#client.on('connectionGraphUpdate', listener);
+      this.#client.subscribeConnectionGraph();
+    });
   }
 
   getTopicType(topic: string) {
