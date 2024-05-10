@@ -9,6 +9,7 @@ import {
 } from '@foxglove/rosmsg2-serialization';
 import {
   type Channel,
+  type ConnectionGraphUpdate,
   FoxgloveClient,
   type MessageData,
   type Parameter,
@@ -16,7 +17,6 @@ import {
   type ParameterValues,
   type Service,
   type ServiceCallResponse,
-  type ConnectionGraphUpdate,
 } from '@foxglove/ws-protocol';
 import EventEmitter from 'eventemitter3';
 import WebSocket from 'isomorphic-ws';

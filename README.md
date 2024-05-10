@@ -1,6 +1,6 @@
 # @tier4/roslibjs-foxglove
 
-An implementation of [roslibjs](https://github.com/RobotWebTools/roslibjs)'s interfaces by using [Foxglove ws-protocol](https://github.com/foxglove/ws-protocol).
+An implementation of [roslibjs](https://github.com/RobotWebTools/roslibjs)'s interfaces by using [Foxglove WebSocket Protocol](https://github.com/foxglove/ws-protocol).
 
 # Install
 
