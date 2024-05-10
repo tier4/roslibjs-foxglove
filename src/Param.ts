@@ -2,10 +2,10 @@ import type { Parameter, ParameterValue } from '@foxglove/ws-protocol';
 import type { Ros } from './Ros';
 
 export class Param {
-  #ros: Ros;
-  #name: string;
+  readonly #ros: Ros;
+  readonly #name: string;
 
-  constructor(options: { ros: Ros; name: string }) {
+  constructor(readonly options: { readonly ros: Ros; readonly name: string }) {
     this.#ros = options.ros;
     this.#name = options.name.replace(':', '.');
   }

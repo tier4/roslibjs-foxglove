@@ -3,20 +3,26 @@ import type { Ros } from './Ros';
 
 export class Message {
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  constructor(values: any) {
+  constructor(readonly values: any) {
     Object.assign(this, values);
   }
 }
 
 export class Topic<TMessage = Message> {
-  #ros: Ros;
-  #name: string;
-  #messageType: string;
+  readonly #ros: Ros;
+  readonly #name: string;
+  readonly #messageType: string;
 
   #publisher?: Promise<Publisher<TMessage>>;
   #subscriptions = new Map<(message: TMessage) => void, Subscription>();
 
-  constructor(options: { ros: Ros; name: string; messageType: string }) {
+  constructor(
+    readonly options: {
+      readonly ros: Ros;
+      readonly name: string;
+      readonly messageType: string;
+    },
+  ) {
     this.#ros = options.ros;
     this.#name = options.name;
     this.#messageType = options.messageType;

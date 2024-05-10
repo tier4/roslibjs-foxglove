@@ -6,7 +6,7 @@ export class Ros {
   /** @internal */
   rosImpl?: Impl;
 
-  constructor(options: { url?: string }) {
+  constructor(readonly options: { readonly url?: string }) {
     if (options.url) {
       this.connect(options.url);
     }
