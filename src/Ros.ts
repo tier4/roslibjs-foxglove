@@ -3,7 +3,7 @@ import type EventEmitter from 'eventemitter3';
 import { type EventTypes, Impl } from './Impl';
 
 export class Ros {
-  #rosImpl?: Impl;
+  #rosImpl: Impl | undefined;
 
   constructor(readonly options: { readonly url?: string }) {
     if (options.url) {
