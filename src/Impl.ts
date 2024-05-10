@@ -1,5 +1,4 @@
 import { parse, parseRos2idl } from '@foxglove/rosmsg';
-import { parse, parseRos2idl } from '@foxglove/rosmsg';
 import {
   MessageReader as Ros1MessageReader,
   MessageWriter as Ros1MessageWriter,
@@ -17,6 +16,7 @@ import {
   type ParameterValues,
   type Service,
   type ServiceCallResponse,
+  type ConnectionGraphUpdate,
 } from '@foxglove/ws-protocol';
 import EventEmitter from 'eventemitter3';
 import WebSocket from 'isomorphic-ws';
