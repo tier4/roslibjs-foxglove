@@ -2,21 +2,27 @@ import type { Ros } from './Ros';
 
 export class ServiceRequest {
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  constructor(values: any) {
+  constructor(readonly values: any) {
     Object.assign(this, values);
   }
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 export class Service<TRequest = any, TResponse = any> {
-  #ros: Ros;
-  #name: string;
-  #serviceType: string;
+  readonly #ros: Ros;
+  readonly #name: string;
+  readonly #serviceType: string;
 
-  constructor(data: { ros: Ros; name: string; serviceType: string }) {
-    this.#ros = data.ros;
-    this.#name = data.name;
-    this.#serviceType = data.serviceType;
+  constructor(
+    readonly options: {
+      readonly ros: Ros;
+      readonly name: string;
+      readonly serviceType: string;
+    },
+  ) {
+    this.#ros = options.ros;
+    this.#name = options.name;
+    this.#serviceType = options.serviceType;
   }
 
   get name() {
