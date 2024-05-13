@@ -2,6 +2,8 @@
 
 An implementation of [roslibjs](https://github.com/RobotWebTools/roslibjs)'s interfaces by using [Foxglove WebSocket Protocol](https://github.com/foxglove/ws-protocol).
 
+roslibjs-foxglove is a client library that communicates with ROS 1 / 2 using [Foxglove bridge](https://docs.foxglove.dev/docs/connecting-to-data/ros-foxglove-bridge/). Unlike the [rosbridge](https://github.com/RobotWebTools/roslibjs) used in the existing roslibjs, Foxglove bridge provides extremely high performance, low latency, and low packet loss rate.
+
 ## Install
 
 ```bash
