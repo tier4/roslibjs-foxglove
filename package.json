@@ -1,6 +1,6 @@
 {
   "name": "@tier4/roslibjs-foxglove",
-  "version": "0.0.1-alpha.4",
+  "version": "0.0.2",
   "description": "An implementation of roslibjs's interfaces by using Foxglove WebSocket Protocol.",
   "author": "TIER IV, Inc.",
   "license": "Apache-2.0",
