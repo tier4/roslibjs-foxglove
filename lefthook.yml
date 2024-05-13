@@ -1,6 +1,5 @@
 pre-commit:
   commands:
     biome:
-      glob: "*.{js,ts,cjs,mjs,cts,mts,jsx,tsx,json,jsonc}"
-      run: npx @biomejs/biome check --apply {staged_files}
+      run: npm run biome
       stage_fixed: true
