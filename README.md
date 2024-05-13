@@ -18,13 +18,15 @@ ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765 # for ROS 2
 
 ### JS / TS side
 
-Since we are releasing the package via GitHub Packages, please create or edit the `.npmrc` file in the same directory as the `package.json` file and add the following line to the file.
+Since we are releasing the package via GitHub Packages, please follow the [official GitHub documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry) to log in to npm.
+
+Then, create or edit the `.npmrc` file in the same directory as the `package.json` file and add the following line to the file.
 
 ```
 @tier4:registry=https://npm.pkg.github.com
 ```
 
-Then, install `@tier4/roslibjs-foxglove` with npm.
+After that, install `@tier4/roslibjs-foxglove` with npm.
 
 ```sh
 npm install @tier4/roslibjs-foxglove
