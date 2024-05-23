@@ -24,8 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and pack
-        run: npm run build && npm pack
+      - name: Build and create a tarball
+        run: npm pack
 
       - name: Publish package
         uses: softprops/action-gh-release@v2
