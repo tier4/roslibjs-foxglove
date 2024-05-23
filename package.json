@@ -23,7 +23,7 @@
     "build": "tsc -b tsconfig.json tsconfig.cjs.json",
     "biome": "biome check --apply .",
     "clean": "rimraf dist",
-    "prepare": "npm run clean && npm run build"
+    "prepack": "npm run clean && npm run build"
   },
   "dependencies": {
     "@foxglove/rosmsg": "^4.2.2",
