@@ -11,9 +11,6 @@
   "bugs": {
     "url": "https://github.com/tier4/roslibjs-foxglove/issues"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
