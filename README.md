@@ -4,11 +4,22 @@ An implementation of [roslibjs](https://github.com/RobotWebTools/roslibjs)'s int
 
 roslibjs-foxglove is a client library that communicates with ROS 1 / 2 using [Foxglove bridge](https://docs.foxglove.dev/docs/connecting-to-data/ros-foxglove-bridge/). Unlike the [rosbridge](https://github.com/RobotWebTools/rosbridge_suite) used in the existing [roslibjs](https://github.com/RobotWebTools/roslibjs), Foxglove bridge provides extremely high performance, low latency, and low packet loss rate.
 
-## Install
+## Getting Started
 
-```bash
+### ROS side
+
+Install and launch Foxglove bridge.
+
+```sh
 sudo apt install ros-$ROS_DISTRO-foxglove-bridge
-npm install @tier4/roslibjs-foxglove
+roslaunch --screen foxglove_bridge foxglove_bridge.launch port:=8765 # for ROS 1
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765 # for ROS 2
+```
+
+### JS / TS side
+
+```sh
+npm install https://github.com/tier4/roslibjs-foxglove/releases/download/v0.0.2/tier4-roslibjs-foxglove-0.0.2.tgz
 ```
 
 ## Supported features
