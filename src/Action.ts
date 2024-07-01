@@ -109,13 +109,16 @@ export class Action {
         });
       }
     });
-    return goal_id;
+    return goal_id.toString();
   }
 
-  cancelGoal(goal_id: { uuid: Uint8Array }) {
-    this.#cancelGoalService.callService({ goal_id: goal_id }, (response) => {
-      console.log(response);
-    });
+  cancelGoal(goal_id: string) {
+    this.#cancelGoalService.callService(
+      { goal_id: new Uint8Array(goal_id.split(',').map(Number)) },
+      (response) => {
+        console.log(response);
+      },
+    );
   }
 
   //   advertise() {}
