@@ -19,6 +19,7 @@ export default class Transform {
    */
   constructor(options) {
     // Copy the values into this object if they exist
+    this.stamp = options.stamp ? options.stamp : undefined;
     this.translation = new Vector3(options.translation);
     this.rotation = new Quaternion(options.rotation);
   }

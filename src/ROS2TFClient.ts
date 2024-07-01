@@ -68,6 +68,7 @@ export class ROS2TFClient extends EventEmitter {
       const info = this.frameInfos[frameID];
       if (info) {
         info.transform = new Transform({
+          stamp: transform.header.stamp,
           translation: transform.transform.translation,
           rotation: transform.transform.rotation,
         });
