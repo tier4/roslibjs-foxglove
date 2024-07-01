@@ -60,7 +60,7 @@ export class ROS2TFClient extends EventEmitter {
    * @param {Object} tf - The TF message from the server.
    */
   processTFArray(tf) {
-    tf.transforms.forEach((transform) => {
+    for (const transform of tf.transforms) {
       let frameID = transform.child_frame_id;
       if (frameID[0] === '/') {
         frameID = frameID.substring(1);
@@ -71,11 +71,11 @@ export class ROS2TFClient extends EventEmitter {
           translation: transform.transform.translation,
           rotation: transform.transform.rotation,
         });
-        info.cbs.forEach((cb) => {
+        for (const cb of info.cbs) {
           cb(info.transform);
-        });
+        }
       }
-    }, this);
+    }
   }
 
   /**
