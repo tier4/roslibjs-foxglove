@@ -1,29 +1,42 @@
-// @ts-nocheck
-
 import { Action } from './Action';
+import type { Ros } from './Ros';
 import Transform from './math/Transform';
 
-// import Ros from '../core/Ros.js';
 import { EventEmitter } from 'eventemitter3';
 
-/**
- * A TF Client that listens to TFs from tf2_web_republisher.
- */
 export class ROS2TFClient extends EventEmitter {
-  /**
-   * @param {Object} options
-   * @param {Ros} options.ros - The ROSLIB.Ros connection handle.
-   * @param {string} [options.fixedFrame=base_link] - The fixed frame.
-   * @param {number} [options.angularThres=2.0] - The angular threshold for the TF republisher.
-   * @param {number} [options.transThres=0.01] - The translation threshold for the TF republisher.
-   * @param {number} [options.rate=10.0] - The rate for the TF republisher.
-   * @param {number} [options.updateDelay=50] - The time (in ms) to wait after a new subscription
-   *     to update the TF republisher's list of TFs.
-   * @param {number} [options.topicTimeout=2.0] - The timeout parameter for the TF republisher.
-   * @param {string} [options.serverName="/tf2_web_republisher"] - The name of the tf2_web_republisher server.
-   * @param {string} [options.repubServiceName="/republish_tfs"] - The name of the republish_tfs service (non groovy compatibility mode only).
-   */
-  constructor(options) {
+  ros: Ros;
+  fixedFrame: string;
+  angularThres: number;
+  transThres: number;
+  rate: number;
+  updateDelay: number;
+  topicTimeout: { secs: number; nsecs: number };
+  serverName: string;
+  goal_id: string;
+  frameInfos: {
+    [frame_id: string]: {
+      cbs: ((tf: Transform) => void)[];
+      transform?: Transform;
+    };
+  };
+  republisherUpdateRequested: boolean;
+
+  actionClient: Action;
+
+  constructor(
+    readonly options: {
+      readonly ros: Ros;
+      readonly fixedFrame: string;
+      readonly angularThres: number;
+      readonly transThres: number;
+      readonly rate: number;
+      readonly updateDelay: number;
+      readonly topicTimeout: number;
+      readonly serverName: string;
+      readonly repubServiceName: string;
+    },
+  ) {
     super();
     this.ros = options.ros;
     this.fixedFrame = options.fixedFrame || 'base_link';
@@ -42,8 +55,6 @@ export class ROS2TFClient extends EventEmitter {
     this.goal_id = '';
     this.frameInfos = {};
     this.republisherUpdateRequested = false;
-    this._subscribeCB = undefined;
-    this._isDisposed = false;
 
     // Create an Action Client
     this.actionClient = new Action({
@@ -53,13 +64,15 @@ export class ROS2TFClient extends EventEmitter {
     });
   }
 
-  /**
-   * Process the incoming TF message and send them out using the callback
-   * functions.
-   *
-   * @param {Object} tf - The TF message from the server.
-   */
-  processTFArray(tf) {
+  processTFArray(tf: {
+    transforms: [
+      {
+        transform: Transform;
+        child_frame_id: string;
+        header: { stamp: { sec: number; nsec: number } };
+      },
+    ];
+  }) {
     for (const transform of tf.transforms) {
       let frameID = transform.child_frame_id;
       if (frameID[0] === '/') {
@@ -78,11 +91,6 @@ export class ROS2TFClient extends EventEmitter {
       }
     }
   }
-
-  /**
-   * Create and send a new goal (or service request) to the tf2_web_republisher
-   * based on the current list of TFs.
-   */
   updateGoal() {
     const goalMessage = {
       source_frames: Object.keys(this.frameInfos),
@@ -95,12 +103,13 @@ export class ROS2TFClient extends EventEmitter {
     if (this.goal_id !== '') {
       this.actionClient.cancelGoal(this.goal_id);
     }
-    this.currentGoal = goalMessage;
+    // this.currentGoal = goalMessage; // is this even used?
 
     const id = this.actionClient.sendGoal(
       goalMessage,
-      (result) => {},
-      (feedback) => {
+      () => {},
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      (feedback: any) => {
         this.processTFArray(feedback);
       },
     );
@@ -110,25 +119,15 @@ export class ROS2TFClient extends EventEmitter {
 
     this.republisherUpdateRequested = false;
   }
-
-  /**
-   * @callback subscribeCallback
-   * @param {Transform} callback.transform - The transform data.
-   */
-  /**
-   * Subscribe to the given TF frame.
-   *
-   * @param {string} frameID - The TF frame to subscribe to.
-   * @param {subscribeCallback} callback - Function with the following params:
-   */
-  subscribe(frameID, callback) {
+  subscribe(frameID: string, callback: (tf: Transform) => void) {
     // remove leading slash, if it's there
-    if (frameID[0] === '/') {
-      frameID = frameID.substring(1);
+    let correctFrameID = frameID;
+    if (correctFrameID[0] === '/') {
+      correctFrameID = correctFrameID.substring(1);
     }
     // if there is no callback registered for the given frame, create empty callback list
-    if (!this.frameInfos[frameID]) {
-      this.frameInfos[frameID] = {
+    if (!this.frameInfos[correctFrameID]) {
+      this.frameInfos[correctFrameID] = {
         cbs: [],
       };
       if (!this.republisherUpdateRequested) {
@@ -138,38 +137,30 @@ export class ROS2TFClient extends EventEmitter {
     }
 
     // if we already have a transform, callback immediately
-    else if (this.frameInfos[frameID].transform) {
-      callback(this.frameInfos[frameID].transform);
+    else if (this.frameInfos[correctFrameID]?.transform) {
+      callback(this.frameInfos[correctFrameID]?.transform as Transform);
     }
-    this.frameInfos[frameID].cbs.push(callback);
+    this.frameInfos[correctFrameID]?.cbs.push(callback);
   }
 
-  /**
-   * Unsubscribe from the given TF frame.
-   *
-   * @param {string} frameID - The TF frame to unsubscribe from.
-   * @param {function} callback - The callback function to remove.
-   */
-  unsubscribe(frameID, callback) {
+  unsubscribe(frameID: string, callback: (tf: Transform) => void) {
     // remove leading slash, if it's there
-    if (frameID[0] === '/') {
-      frameID = frameID.substring(1);
+    let correctFrameID = frameID;
+    if (correctFrameID[0] === '/') {
+      correctFrameID = correctFrameID.substring(1);
     }
-    const info = this.frameInfos[frameID];
-    for (var cbs = (info && info.cbs) || [], idx = cbs.length; idx--; ) {
+    const info = this.frameInfos[correctFrameID];
+    const cbs = info?.cbs || [];
+    for (let idx = cbs.length; idx--; ) {
       if (cbs[idx] === callback) {
         cbs.splice(idx, 1);
       }
     }
     if (!callback || cbs.length === 0) {
-      delete this.frameInfos[frameID];
+      delete this.frameInfos[correctFrameID];
     }
   }
 
-  /**
-   * Unsubscribe and unadvertise all topics associated with this TFClient.
-   */
   dispose() {
-    this._isDisposed = true;
   }
 }
