@@ -9,8 +9,8 @@ export default class Transform {
   constructor(
     readonly options: {
       readonly stamp?: { sec: number; nsec: number };
-      readonly translation: Vector3;
-      readonly rotation: Quaternion;
+      readonly translation: { x: number; y: number; z: number };
+      readonly rotation: { x: number; y: number; z: number; w: number };
     },
   ) {
     this.stamp = options.stamp ? options.stamp : undefined;

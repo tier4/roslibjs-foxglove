@@ -7,15 +7,13 @@ export class Action {
   readonly #name: string;
   readonly #actionType: string;
 
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  #feedbackListener: Topic<any>;
+  #feedbackListener: Topic<{ goal_id: { uuid: Uint8Array } }>;
 
   #sendGoalService: Service;
   #cancelGoalService: Service;
   #getResultService: Service;
 
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  #goalsCallbacks: { [key: string]: (message: any) => void };
+  #goalsCallbacks: { [key: string]: (message: unknown) => void };
 
   constructor(
     readonly options: {
@@ -30,8 +28,7 @@ export class Action {
 
     this.#goalsCallbacks = {};
 
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    this.#feedbackListener = new Topic<any>({
+    this.#feedbackListener = new Topic({
       ros: this.#ros,
       name: `${this.#name}/_action/feedback`,
       messageType: `${this.#actionType}_FeedbackMessage`,
@@ -59,8 +56,7 @@ export class Action {
       if (this.#goalsCallbacks[message.goal_id.toString()] !== undefined) {
         (
           this.#goalsCallbacks[message.goal_id.toString()] as (
-            // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-            message: any,
+            feedback: unknown,
           ) => void
         )(message);
       }
@@ -76,14 +72,13 @@ export class Action {
   }
 
   sendGoal(
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    goal: any,
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    resultCallback?: any,
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    feedbackCallback?: any,
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    failedCallback?: any,
+    goal: {
+      goal_id?: { uuid: Uint8Array };
+      [key: string]: unknown;
+    },
+    resultCallback?: (result: unknown) => void,
+    feedbackCallback?: (feedback: unknown) => void,
+    failedCallback?: (result: unknown) => void,
   ) {
     const goal_id = {
       uuid: crypto.getRandomValues(
@@ -96,15 +91,20 @@ export class Action {
     this.#sendGoalService.callService(goal, (response) => {
       // console.log(response);
       if (response.accepted) {
-        this.#goalsCallbacks[goal_id.toString()] = feedbackCallback;
-
+        if (feedbackCallback !== undefined) {
+          this.#goalsCallbacks[goal_id.toString()] = feedbackCallback;
+        }
         this.#getResultService.callService({ goal_id: goal_id }, (response) => {
           // console.log(response);
           delete this.#goalsCallbacks[goal_id.toString()];
           if (response.status === 6) {
-            failedCallback(response);
+            if (failedCallback !== undefined) {
+              failedCallback(response);
+            }
           } else {
-            resultCallback(response);
+            if (resultCallback !== undefined) {
+              resultCallback(response);
+            }
           }
         });
       }

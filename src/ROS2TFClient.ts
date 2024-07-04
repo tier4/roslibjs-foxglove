@@ -4,6 +4,16 @@ import Transform from './math/Transform';
 
 import { EventEmitter } from 'eventemitter3';
 
+type TFArray = {
+  transforms: [
+    {
+      transform: Transform;
+      child_frame_id: string;
+      header: { stamp: { sec: number; nsec: number } };
+    },
+  ];
+};
+
 export class ROS2TFClient extends EventEmitter {
   ros: Ros;
   fixedFrame: string;
@@ -64,15 +74,7 @@ export class ROS2TFClient extends EventEmitter {
     });
   }
 
-  processTFArray(tf: {
-    transforms: [
-      {
-        transform: Transform;
-        child_frame_id: string;
-        header: { stamp: { sec: number; nsec: number } };
-      },
-    ];
-  }) {
+  processTFArray(tf: TFArray) {
     for (const transform of tf.transforms) {
       let frameID = transform.child_frame_id;
       if (frameID[0] === '/') {
@@ -108,9 +110,8 @@ export class ROS2TFClient extends EventEmitter {
     const id = this.actionClient.sendGoal(
       goalMessage,
       () => {},
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      (feedback: any) => {
-        this.processTFArray(feedback);
+      (feedback) => {
+        this.processTFArray(feedback as TFArray);
       },
     );
     if (typeof id === 'string') {
@@ -161,6 +162,5 @@ export class ROS2TFClient extends EventEmitter {
     }
   }
 
-  dispose() {
-  }
+  dispose() {}
 }

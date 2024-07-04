@@ -8,8 +8,8 @@ export default class Pose {
 
   constructor(
     readonly options: {
-      readonly position: Vector3;
-      readonly orientation: Quaterion;
+      readonly position: { x: number; y: number; z: number };
+      readonly orientation: { x: number; y: number; z: number; w: number };
     },
   ) {
     const values = options || {};
