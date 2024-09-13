@@ -36,9 +36,7 @@ export interface Subscription {
   unsubscribe: () => void;
 }
 
-export class Impl {
-  readonly emitter = new EventEmitter<EventTypes>();
-
+export class Impl extends EventEmitter<EventTypes> {
   #client: FoxgloveClient;
   #connecting: Promise<void>;
   #isRos1?: boolean;
@@ -62,6 +60,8 @@ export class Impl {
   #paramId = 0;
 
   constructor(url: string) {
+    super();
+
     this.#client = new FoxgloveClient({
       ws: new WebSocket(url, [FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
     });
@@ -77,10 +77,10 @@ export class Impl {
     });
 
     this.#client.on('close', (event) => {
-      this.emitter.emit('close', event);
+      this.emit('close', event);
     });
     this.#client.on('error', (error?: Error) => {
-      this.emitter.emit('error', error ?? new Error('WebSocket error'));
+      this.emit('error', error ?? new Error('WebSocket error'));
     });
 
     this.#client.on('advertise', (channels) => {
@@ -117,7 +117,7 @@ export class Impl {
 
     this.#connecting = new Promise<void>((resolve) => {
       Promise.all([open, serverInfo]).then(() => {
-        this.emitter.emit('connection');
+        this.emit('connection');
         resolve();
       });
     });
