@@ -37,14 +37,14 @@ export class ROS2TFClient extends EventEmitter {
   constructor(
     readonly options: {
       readonly ros: Ros;
-      readonly fixedFrame: string;
-      readonly angularThres: number;
-      readonly transThres: number;
-      readonly rate: number;
-      readonly updateDelay: number;
-      readonly topicTimeout: number;
-      readonly serverName: string;
-      readonly repubServiceName: string;
+      readonly fixedFrame?: string;
+      readonly angularThres?: number;
+      readonly transThres?: number;
+      readonly rate?: number;
+      readonly updateDelay?: number;
+      readonly topicTimeout?: number;
+      readonly serverName?: string;
+      readonly repubServiceName?: string;
     },
   ) {
     super();
