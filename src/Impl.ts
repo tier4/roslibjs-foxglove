@@ -134,7 +134,8 @@ export class Impl {
     };
   }
 
-  getServices() {
+  async getServices() {
+    await this.#connecting;
     return new Promise<string[]>((resolve) => {
       const listener = (event: ConnectionGraphUpdate) => {
         this.#client.off('connectionGraphUpdate', listener);
