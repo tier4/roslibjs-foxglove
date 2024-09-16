@@ -19,7 +19,7 @@ ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765 # for ROS 2
 ### JS / TS side
 
 ```sh
-npm install https://github.com/tier4/roslibjs-foxglove/releases/download/v0.0.3/tier4-roslibjs-foxglove-0.0.3.tgz
+npm install https://github.com/tier4/roslibjs-foxglove/releases/download/v0.0.4/tier4-roslibjs-foxglove-0.0.4.tgz
 ```
 
 ## Supported features
