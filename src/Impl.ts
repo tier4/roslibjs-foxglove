@@ -63,7 +63,7 @@ export class Impl {
 
   constructor(url: string) {
     this.#client = new FoxgloveClient({
-      ws: new WebSocket(url, [FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
+      ws: new WebSocket(url, ["foxglove.sdk.v1", FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
     });
 
     const open = new Promise<void>((resolve) => {
