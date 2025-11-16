@@ -20,7 +20,8 @@
     "build": "tsc -b tsconfig.json tsconfig.cjs.json",
     "biome": "biome check --apply .",
     "clean": "rimraf dist",
-    "prepack": "npm run clean && npm run build"
+    "prepack": "npm run clean && npm run build",
+    "watch": "watch 'npm run build' ./src"
   },
   "dependencies": {
     "@foxglove/rosmsg": "^4.2.2",
@@ -34,6 +35,7 @@
     "@biomejs/biome": "1.7.3",
     "lefthook": "^1.6.10",
     "rimraf": "^5.0.5",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "watch": "^1.0.2"
   }
 }
