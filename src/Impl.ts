@@ -333,15 +333,23 @@ export class Impl {
     const name =
       'schemaName' in channelOrService
         ? channelOrService.schemaName
-        : channelOrService.type;
+        : 'response' in channelOrService
+          ? channelOrService.response.schemaName
+          : undefined;
     const schemaEncoding =
       'schemaEncoding' in channelOrService
         ? channelOrService.schemaEncoding
-        : undefined;
+        : 'response' in channelOrService
+          ? channelOrService.response.schemaEncoding
+          : undefined;
     const schema =
       'schema' in channelOrService
         ? channelOrService.schema
-        : channelOrService.responseSchema;
+        : 'response' in channelOrService
+          ? channelOrService.response.schema
+          : 'responseSchema' in channelOrService
+            ? channelOrService.responseSchema
+            : undefined;
     return (
       this.#messageReaders.get(name) ??
       (() => {
@@ -366,11 +374,17 @@ export class Impl {
     const schemaEncoding =
       'schemaEncoding' in channelOrService
         ? channelOrService.schemaEncoding
-        : undefined;
+        : 'request' in channelOrService
+          ? channelOrService.request.schemaEncoding
+          : undefined;
     const schema =
       'schema' in channelOrService
         ? channelOrService.schema
-        : channelOrService.requestSchema;
+        : 'request' in channelOrService
+          ? channelOrService.request.schema
+          : 'requestSchema' in channelOrService
+            ? channelOrService.requestSchema
+            : undefined;
     return (
       this.#messageWriters.get(name) ??
       (() => {
