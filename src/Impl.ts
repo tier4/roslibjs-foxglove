@@ -63,7 +63,10 @@ export class Impl {
 
   constructor(url: string) {
     this.#client = new FoxgloveClient({
-      ws: new WebSocket(url, ['foxglove.sdk.v1', FoxgloveClient.SUPPORTED_SUBPROTOCOL]),
+      ws: new WebSocket(url, [
+        'foxglove.sdk.v1',
+        FoxgloveClient.SUPPORTED_SUBPROTOCOL,
+      ]),
     });
 
     const open = new Promise<void>((resolve) => {
@@ -342,6 +345,9 @@ export class Impl {
       'schema' in channelOrService
         ? channelOrService.schema
         : channelOrService.responseSchema;
+    if (schema == undefined) {
+      throw new Error(`Missing schema for "${name}"`);
+    }
     return (
       this.#messageReaders.get(name) ??
       (() => {
@@ -371,6 +377,9 @@ export class Impl {
       'schema' in channelOrService
         ? channelOrService.schema
         : channelOrService.requestSchema;
+    if (schema == undefined) {
+      throw new Error(`Missing schema for "${name}"`);
+    }
     return (
       this.#messageWriters.get(name) ??
       (() => {
