@@ -1,5 +1,5 @@
 pre-commit:
   commands:
     biome:
-      run: npm run biome
+      run: pnpm run biome
       stage_fixed: true
