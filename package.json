@@ -4,6 +4,7 @@
   "description": "An implementation of roslibjs's interfaces by using Foxglove WebSocket Protocol.",
   "author": "TIER IV, Inc.",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@10.30.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tier4/roslibjs-foxglove.git"
@@ -20,7 +21,7 @@
     "build": "tsc -b tsconfig.json tsconfig.cjs.json",
     "biome": "biome check --apply .",
     "clean": "rimraf dist",
-    "prepack": "npm run clean && npm run build"
+    "prepack": "pnpm run clean && pnpm run build"
   },
   "dependencies": {
     "@foxglove/rosmsg": "^4.2.2",
