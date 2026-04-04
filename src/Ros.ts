@@ -1,11 +1,12 @@
-import type EventEmitter from 'eventemitter3';
+import EventEmitter from 'eventemitter3';
 
 import { type EventTypes, Impl } from './Impl';
 
-export class Ros {
+export class Ros extends EventEmitter<EventTypes> {
   #rosImpl: Impl | undefined;
 
   constructor(readonly options: { readonly url?: string }) {
+    super();
     if (options.url) {
       this.connect(options.url);
     }
@@ -16,24 +17,17 @@ export class Ros {
     return this.#rosImpl;
   }
 
-  on<T extends EventEmitter.EventNames<EventTypes>>(
-    event: T,
-    fn: EventEmitter.EventListener<EventTypes, T>,
-  ): this {
-    this.rosImpl?.emitter.on(event, fn);
-    return this;
-  }
-
-  off<T extends EventEmitter.EventNames<EventTypes>>(
-    event: T,
-    fn: EventEmitter.EventListener<EventTypes, T>,
-  ): this {
-    this.rosImpl?.emitter.off(event, fn);
-    return this;
-  }
-
   connect(url: string) {
     this.#rosImpl = new Impl(url);
+    this.#rosImpl.on('connection', () => {
+      this.emit('connection');
+    });
+    this.#rosImpl.on('close', (event) => {
+      this.emit('close', event);
+    });
+    this.#rosImpl.on('error', (error) => {
+      this.emit('error', error);
+    });
   }
 
   close() {
